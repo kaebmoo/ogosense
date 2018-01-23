@@ -37,6 +37,10 @@ SOFTWARE.
 #include <WEMOS_SHT3X.h>
 #include <TM1637Display.h>
 
+#include <EEPROM.h>
+
+#include <Timer.h>
+
 const int chipSelect = D8; // SD CARD
 
 const int CLK = D6; //Set the CLK pin connection to the display
@@ -54,14 +58,17 @@ float mintemp = 0.0;
 float maxhumidity = 99.0;
 float minhumidity = 0.0;
 
-float temperature_setpoint = 22.0;
+float temperature_setpoint = 30.0;  // 22.0 - 18.0 C
 float temperature_range = 4.0;
 
-float humidity_setpoint = 60.0;
+float humidity_setpoint = 60.0;     // 60 - 40 RH %
 float humidity_range = 20;
 
+char t_setpoint[6] = "30";
+char t_range[6] = "4";
 char h_setpoint[6] = "60";
 char h_range[6] = "20";
+char c_options[6] = "";
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 
@@ -89,6 +96,12 @@ const long interval = 2000;
 int ledState = LOW;
 unsigned long previousMillis = 0;
 
+//flag for saving data
+bool shouldSaveConfig = false;
+
+Timer t_relay;
+int RelayEvent = -1;
+
 void setup() {
 
   Serial.begin(115200);
@@ -101,13 +114,33 @@ void setup() {
   options = analogRead(analogReadPin);
   Serial.println(options);
 
-      // put your setup code here, to run once:
-    Serial.begin(115200);
+  // put your setup code here, to run once:
+  Serial.begin(115200);
+  EEPROM.begin(512);
+  humidity_setpoint = (float) eeGetInt(0);
+  humidity_range = (float) eeGetInt(4);
+  temperature_setpoint = (float) eeGetInt(8);
+  temperature_range = (float) eeGetInt(12);
+  options = eeGetInt(16);
+  Serial.println();
+  Serial.print("Temperature : ");
+  Serial.println(temperature_setpoint);
+  Serial.print("Temperature Range : ");
+  Serial.println(temperature_range);
+  Serial.print("Humidity : ");
+  Serial.println(humidity_setpoint);
+  Serial.print("Humidity Range : ");
+  Serial.println(humidity_range);
+  Serial.print("Option : ");
+  Serial.println(options);
 
-  WiFiManagerParameter custom_h_setpoint("humidity", "setpoint", h_setpoint, 6);
-  WiFiManagerParameter custom_h_range("h_range", "range", h_range, 6);
-  
-  
+  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint", t_setpoint, 6);
+  WiFiManagerParameter custom_t_range("t_range", "temperature range", t_range, 6);
+  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint", h_setpoint, 6);
+  WiFiManagerParameter custom_h_range("h_range", "humidity range", h_range, 6);
+  WiFiManagerParameter custom_c_options("c_options", "option", c_options, 6);
+
+
     //WiFiManager
     //Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wifiManager;
@@ -115,9 +148,13 @@ void setup() {
 
     //set config save notify callback
     wifiManager.setSaveConfigCallback(saveConfigCallback);
+    
+    wifiManager.addParameter(&custom_t_setpoint);
+    wifiManager.addParameter(&custom_t_range);
     wifiManager.addParameter(&custom_h_setpoint);
     wifiManager.addParameter(&custom_h_range);
-    
+    wifiManager.addParameter(&custom_c_options);
+
     //reset saved settings
     //wifiManager.resetSettings();
 
@@ -145,31 +182,56 @@ void setup() {
 
     //if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
-    strcpy(h_setpoint, custom_h_setpoint.getValue());
-    strcpy(h_range, custom_h_range.getValue());
-    Serial.print("Humidity : ");
-    Serial.println(h_setpoint);
-    Serial.print("Humidity Range : ");
-    Serial.println(h_range);
-
-    humidity_setpoint = atol(h_setpoint);
-    humidity_range = atol(h_range);
     
+
+    if (shouldSaveConfig) {
+      strcpy(t_setpoint, custom_t_setpoint.getValue());
+      strcpy(t_range, custom_t_range.getValue());
+      strcpy(h_setpoint, custom_h_setpoint.getValue());
+      strcpy(h_range, custom_h_range.getValue());
+      strcpy(c_options, custom_c_options.getValue());
+      
+      Serial.print("Temperature : ");
+      Serial.println(t_setpoint);
+      Serial.print("Temperature Range : ");
+      Serial.println(t_range);
+      Serial.print("Humidity : ");
+      Serial.println(h_setpoint);
+      Serial.print("Humidity Range : ");
+      Serial.println(h_range);
+      Serial.print("Option : ");
+      Serial.println(c_options);
+  
+      temperature_setpoint = atol(t_setpoint);
+      temperature_range = atol(t_range);
+      humidity_setpoint = atol(h_setpoint);
+      humidity_range = atol(h_range);
+      options = atoi(c_options);
+      
+      eeWriteInt(0, atoi(h_setpoint));
+      eeWriteInt(4, atoi(h_range));
+      eeWriteInt(8, atoi(t_setpoint));
+      eeWriteInt(12, atoi(t_range));
+      eeWriteInt(16, options);
+    }
+
     ThingSpeak.begin( client );
 }
 
 void loop() {
+  /*
   options = analogRead(analogReadPin);
   Serial.print("Analog Read : ");
   Serial.print(options);
-  
+
   if (options < 100)
     options = 0;  // humidity
    else if (options > 100 && options < 200)
     options = 1;  // temperature
    else
     options = 2;  // temperature && humidity
-
+  */
+  
   Serial.print("\tOptions : ");
   Serial.println(options);
 
@@ -199,9 +261,9 @@ void loop() {
     display.setSegments(data);
     display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
     delay(2000);
-    
+
     blink();
-    
+
     // 0x76 = H
     data[0] = 0x00;
     data[1] = 0x00;
@@ -212,10 +274,10 @@ void loop() {
     display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
     delay(2000);
 
-    
+
     if (MOISTURE) {
       if (sht30.humidity < humidity_setpoint) {
-        
+
         humion = true;
       }
       else if (sht30.humidity > (humidity_setpoint + humidity_range)) {
@@ -227,32 +289,32 @@ void loop() {
         humion = true;
       }
       else if (sht30.humidity < (humidity_setpoint - humidity_range)) {
-  
+
         humion = false;
       }
     }
-  
+
     if(COOL) {
       if (sht30.cTemp > temperature_setpoint) {
-  
+
         tempon = true;
       }
       else if (sht30.cTemp < (temperature_setpoint - temperature_range)) {
-  
+
         tempon = false;
       }
     }
     else {
       if (sht30.cTemp < temperature_setpoint) {
-  
+
         tempon = true;
       }
       else if (sht30.cTemp > (temperature_setpoint + temperature_range)) {
-  
+
         tempon = false;
       }
     }
-  
+
     if (options == 2) {
       Serial.println("Option: Temperature & Humidity");
       if (tempon == true && humion == true) {
@@ -282,35 +344,35 @@ void loop() {
     else {
       Serial.println("Option: Humidity");
       if (humion == true) {
-        digitalWrite(RELAY2, HIGH);
-        Serial.println("RELAY2 ON");
+        digitalWrite(RELAY1, HIGH);
+        Serial.println("RELAY1 ON");
         digitalWrite(LED_BUILTIN, LOW);  // turn on
       }
       else if (humion == false) {
-        digitalWrite(RELAY2, LOW);
-        Serial.println("RELAY2 OFF");
+        digitalWrite(RELAY1, LOW);
+        Serial.println("RELAY1 OFF");
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
       }
     }
-  
+
     Serial.print("tempon = ");
     Serial.print(tempon);
     Serial.print(" humion = ");
     Serial.println(humion);
     Serial.println();
-  
+
     // Only update if posting time is exceeded
     unsigned long currentMillis = millis();
     if (currentMillis - lastUpdateTime >=  postingInterval) {
       lastUpdateTime = currentMillis;
-      
+
       float fahrenheitTemperature, celsiusTemperature;
       float rhHumidity;
-      
+
       fahrenheitTemperature = sht30.fTemp;
       celsiusTemperature = sht30.cTemp;
       rhHumidity = sht30.humidity;
-      
+
       Serial.print(celsiusTemperature);
       Serial.print(", ");
       Serial.print(fahrenheitTemperature);
@@ -323,14 +385,16 @@ void loop() {
       //ThingSpeak.writeField(channelID, dataFieldTwo, rhHumidity, writeAPIKey);
       //ThingSpeak.writeField(channelID, dataFieldThree, fahrenheitTemperature, writeAPIKey);
       write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
-  
-  
+
+
     }
   }
   else
   {
     Serial.println("Sensor Error!");
   }
+
+  t_relay.update();
 
 }
 
@@ -348,14 +412,32 @@ int write2TSData( long TSChannel, unsigned int TSField1, float field1Data, unsig
 //callback notifying us of the need to save config
 void saveConfigCallback () {
   Serial.println("Should save config");
-  // shouldSaveConfig = true;
-  
+  shouldSaveConfig = true;
+}
+
+void eeWriteInt(int pos, int val) {
+    byte* p = (byte*) &val;
+    EEPROM.write(pos, *p);
+    EEPROM.write(pos + 1, *(p + 1));
+    EEPROM.write(pos + 2, *(p + 2));
+    EEPROM.write(pos + 3, *(p + 3));
+    EEPROM.commit();
+}
+
+int eeGetInt(int pos) {
+  int val;
+  byte* p = (byte*) &val;
+  *p        = EEPROM.read(pos);
+  *(p + 1)  = EEPROM.read(pos + 1);
+  *(p + 2)  = EEPROM.read(pos + 2);
+  *(p + 3)  = EEPROM.read(pos + 3);
+  return val;
 }
 
 int init_sdcard()
 {
   unsigned long dataSize;
-  
+
   Serial.println("Initializing SD card...");
   // see if the card is present and can be initialized:
   if (!SD.begin(chipSelect)) {
@@ -364,7 +446,7 @@ int init_sdcard()
     return -1;
   }
   Serial.println("Card initialized.");
- 
+
   File dataFile = SD.open("datalog.txt");
   if (dataFile) {
     // check file size if > 1GB delete it
@@ -373,29 +455,29 @@ int init_sdcard()
     if (dataSize > 1000000000) {
       Serial.println("file size > 1GB, deleting.");
       dataFile.close();
-      SD.remove("datalog.txt");      
+      SD.remove("datalog.txt");
       Serial.println("file deleted.");
     }
-    
+
   }
-  
+
   return 0;
 
 }
 
 void write_datalogger(String dataString) {
-  
+
 
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   File dataFile = SD.open("datalog.txt", FILE_WRITE);
 
   // if the file is available, write to it:
-  if (dataFile) {    
+  if (dataFile) {
     dataFile.println(dataString);
     dataFile.close();
     // print to the serial port too:
-    Serial.println(dataString);    
+    Serial.println(dataString);
   }
   // if the file isn't open, pop up an error:
   else {
