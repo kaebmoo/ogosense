@@ -338,7 +338,7 @@ void loop() {
         Serial.println("RELAY1 OFF");
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
         // delay start
-        if (RelayEvent == true) {
+        if (RelayEvent == true && afterStop == -1) {
             afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
             Serial.println("Timer Delay Start");
         }
@@ -365,7 +365,7 @@ void loop() {
         Serial.println("RELAY1 OFF");
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
         // delay start
-        if (RelayEvent == true) {
+        if (RelayEvent == true && afterStop == -1) {
             afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
             Serial.println("Timer Delay Start");
         }
@@ -393,7 +393,7 @@ void loop() {
         Serial.println("RELAY1 OFF");
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
         // delay start
-        if (RelayEvent == true) {
+        if (RelayEvent == true && afterStop == -1) {
             afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
             Serial.println("Timer Delay Start");
         }
