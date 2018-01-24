@@ -99,8 +99,10 @@ unsigned long previousMillis = 0;
 //flag for saving data
 bool shouldSaveConfig = false;
 
-Timer t_relay;
-int RelayEvent = -1;
+Timer t_relay, t_delayStart;
+bool RelayEvent = false;
+int afterStart = -1;
+int afterStop = -1;
 
 void setup() {
 
@@ -148,7 +150,7 @@ void setup() {
 
     //set config save notify callback
     wifiManager.setSaveConfigCallback(saveConfigCallback);
-    
+
     wifiManager.addParameter(&custom_t_setpoint);
     wifiManager.addParameter(&custom_t_range);
     wifiManager.addParameter(&custom_h_setpoint);
@@ -182,7 +184,7 @@ void setup() {
 
     //if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
-    
+
 
     if (shouldSaveConfig) {
       strcpy(t_setpoint, custom_t_setpoint.getValue());
@@ -190,7 +192,7 @@ void setup() {
       strcpy(h_setpoint, custom_h_setpoint.getValue());
       strcpy(h_range, custom_h_range.getValue());
       strcpy(c_options, custom_c_options.getValue());
-      
+
       Serial.print("Temperature : ");
       Serial.println(t_setpoint);
       Serial.print("Temperature Range : ");
@@ -201,13 +203,13 @@ void setup() {
       Serial.println(h_range);
       Serial.print("Option : ");
       Serial.println(c_options);
-  
+
       temperature_setpoint = atol(t_setpoint);
       temperature_range = atol(t_range);
       humidity_setpoint = atol(h_setpoint);
       humidity_range = atol(h_range);
       options = atoi(c_options);
-      
+
       eeWriteInt(0, atoi(h_setpoint));
       eeWriteInt(4, atoi(h_range));
       eeWriteInt(8, atoi(t_setpoint));
@@ -231,7 +233,7 @@ void loop() {
    else
     options = 2;  // temperature && humidity
   */
-  
+
   Serial.print("\tOptions : ");
   Serial.println(options);
 
@@ -318,40 +320,83 @@ void loop() {
     if (options == 2) {
       Serial.println("Option: Temperature & Humidity");
       if (tempon == true && humion == true) {
-        digitalWrite(RELAY1, HIGH);
-        Serial.println("RELAY1 ON");
-        digitalWrite(LED_BUILTIN, LOW);  // turn on
+        if (RelayEvent == false) {
+          afterStart = t_relay.after(30 * 1000, turnoff);
+          Serial.println("On Timer Start.");
+          RelayEvent = true;
+          digitalWrite(RELAY1, HIGH);
+          Serial.println("RELAY1 ON");
+          digitalWrite(LED_BUILTIN, LOW);  // turn on
+        }
       }
       else if (tempon == false && humion == false) {
+        if (afterStart != -1) {
+          t_relay.stop(afterStart);
+          afterStart = -1;
+        }
         digitalWrite(RELAY1, LOW);
         Serial.println("RELAY1 OFF");
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
+        // delay start
+        if (RelayEvent == true) {
+            afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
+            Serial.println("Timer Delay Start");
+        }
       }
     }
     else if (options == 1) {
       Serial.println("Option: Temperature");
       if (tempon == true) {
-        digitalWrite(RELAY1, HIGH);
-        Serial.println("RELAY1 ON");
-        digitalWrite(LED_BUILTIN, LOW);  // turn on
+        if (RelayEvent == false) {
+          afterStart = t_relay.after(30 * 1000, turnoff);
+          Serial.println("On Timer Start.");
+          RelayEvent = true;
+          digitalWrite(RELAY1, HIGH);
+          Serial.println("RELAY1 ON");
+          digitalWrite(LED_BUILTIN, LOW);  // turn on
+        }
       }
       else if (tempon == false) {
+        if (afterStart != -1) {
+          t_relay.stop(afterStart);
+          afterStart = -1;
+        }
         digitalWrite(RELAY1, LOW);
         Serial.println("RELAY1 OFF");
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
+        // delay start
+        if (RelayEvent == true) {
+            afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
+            Serial.println("Timer Delay Start");
+        }
+
       }
     }
     else {
       Serial.println("Option: Humidity");
       if (humion == true) {
-        digitalWrite(RELAY1, HIGH);
-        Serial.println("RELAY1 ON");
-        digitalWrite(LED_BUILTIN, LOW);  // turn on
+        if (RelayEvent == false) {
+          afterStart = t_relay.after(30 * 1000, turnoff);
+          Serial.println("On Timer Start.");
+          RelayEvent = true;
+          digitalWrite(RELAY1, HIGH);
+          Serial.println("RELAY1 ON");
+          digitalWrite(LED_BUILTIN, LOW);  // turn on
+        }
       }
       else if (humion == false) {
+        if (afterStart != -1) {
+          t_relay.stop(afterStart);
+          afterStart = -1;
+        }
         digitalWrite(RELAY1, LOW);
         Serial.println("RELAY1 OFF");
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
+        // delay start
+        if (RelayEvent == true) {
+            afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
+            Serial.println("Timer Delay Start");
+        }
       }
     }
 
@@ -396,6 +441,22 @@ void loop() {
 
   t_relay.update();
 
+}
+
+void turnoff()
+{
+  afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
+  digitalWrite(RELAY1, LOW);
+  Serial.println("Timer Stop: RELAY1 OFF");
+  digitalWrite(LED_BUILTIN, HIGH);  // turn off
+  afterStart = -1;
+}
+
+void delayStart()
+{
+  RelayEvent = false;
+  afterStop = -1;
+  Serial.println("Timer Delay Start End.");
 }
 
 //use this function if you want multiple fields simultaneously
