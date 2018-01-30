@@ -81,10 +81,10 @@ int options = 0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 414252;
-char *readAPIKey = "7SGL05KU9TXSUD2N";
-char *writeAPIKey = "IVDCJXLE6GUKW41L";
-const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
+unsigned long channelID = 411029;
+char *readAPIKey = "YMT3SYCTNWTF4ZVP";
+char *writeAPIKey = "C3H5WESZ8BIVPVHJ";
+const unsigned long postingInterval = 15L * 1000L;
 
 unsigned int dataFieldFour = 4;                            // Field to write temperature C data
 unsigned int dataFieldFive = 5;
