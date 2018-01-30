@@ -81,11 +81,14 @@ int options = 0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 360709;
-char *readAPIKey = "GNZ8WEU763Z5DUEA";
-char *writeAPIKey = "8M07EYX8NPCD9V8U";
+unsigned long channelID = 411029;
+char *readAPIKey = "YMT3SYCTNWTF4ZVP";
+char *writeAPIKey = "C3H5WESZ8BIVPVHJ";
 const unsigned long postingInterval = 15L * 1000L;
-unsigned int dataFieldOne = 1;                            // Field to write temperature C data
+
+unsigned int dataFieldFour = 4;                            // Field to write temperature C data
+unsigned int dataFieldFive = 5;
+unsigned int dataFieldOne = 1;
 unsigned int dataFieldTwo = 2;                       // Field to write relative humidity data
 unsigned int dataFieldThree = 3;                     // Field to write temperature F data
 unsigned long lastConnectionTime = 0;
@@ -424,13 +427,18 @@ void loop() {
       Serial.print(", ");
       Serial.print(rhHumidity);
       Serial.println();
-      Serial.println("Sending data to ThingSpeak");
-      Serial.println();
+      Serial.print("Sending data to ThingSpeak : ");
+      
       //ThingSpeak.writeField(channelID, dataFieldOne, celsiusTemperature, writeAPIKey);
       //ThingSpeak.writeField(channelID, dataFieldTwo, rhHumidity, writeAPIKey);
       //ThingSpeak.writeField(channelID, dataFieldThree, fahrenheitTemperature, writeAPIKey);
-      write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
-
+      // write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
+      
+      ThingSpeak.setField( 1, celsiusTemperature );
+      ThingSpeak.setField( 2, rhHumidity );    
+      int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
+      Serial.println(writeSuccess);
+      Serial.println();
 
     }
   }
