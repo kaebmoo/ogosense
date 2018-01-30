@@ -429,19 +429,9 @@ void loop() {
     Serial.print(tempon);
     Serial.print(" humion = ");
     Serial.println(humion);
-    Serial.println();
+    // Serial.println();
 
-    if (microgear.connected())
-    {
-       microgear.loop();
-       // Serial.println("publish to netpie");
-       // microgear.publish(mystatus, digitalRead(RELAY1), true);
-    }
-   else
-   {
-    Serial.println("connection lost, reconnect...");
-    microgear.connect(APPID);
-   }
+    
 
     // Only update if posting time is exceeded
     unsigned long currentMillis = millis();
@@ -474,7 +464,6 @@ void loop() {
       int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
       Serial.println(writeSuccess);
       Serial.println();
-
     }
   }
   else
@@ -482,6 +471,17 @@ void loop() {
     Serial.println("Sensor Error!");
   }
 
+  if (microgear.connected()) {
+    microgear.loop();
+    Serial.println("publish to netpie");
+    microgear.publish(mystatus, digitalRead(RELAY1), true);
+  }
+  else {
+    Serial.println("connection lost, reconnect...");
+    microgear.connect(APPID);
+  }
+  Serial.println();
+  
   t_relay.update();
   t_delayStart.update();
   timer_delaysend.update();
