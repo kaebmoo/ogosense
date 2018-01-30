@@ -137,7 +137,7 @@ void setup() {
   microgear.on(MESSAGE,onMsghandler);
   microgear.on(CONNECTED,onConnected);
   microgear.setEEPROMOffset(48);
-
+  
   Serial.begin(115200);
   EEPROM.begin(512);
   humidity_setpoint = (float) eeGetInt(0);
@@ -351,7 +351,7 @@ void loop() {
           RelayEvent = true;
           digitalWrite(RELAY1, HIGH);
           Serial.println("RELAY1 ON");
-          digitalWrite(LED_BUILTIN, LOW);  // turn on
+          digitalWrite(LED_BUILTIN, LOW);  // turn on          
         }
       }
       else if (tempon == false && humion == false) {
@@ -434,10 +434,11 @@ void loop() {
     if (microgear.connected())
     {
        microgear.loop();
-       // Serial.println("publish to netpie");
-       // microgear.publish(mystatus, digitalRead(RELAY1), true);
+       Serial.println("publish to netpie");
+       //microgear.publish(mystatus, "1");
+       microgear.publish(mystatus, digitalRead(RELAY1), true);
     }
-   else
+   else 
    {
     Serial.println("connection lost, reconnect...");
     microgear.connect(APPID);
@@ -462,14 +463,14 @@ void loop() {
       Serial.print(rhHumidity);
       Serial.println();
       Serial.print("Sending data to ThingSpeak : ");
-
+      
       //ThingSpeak.writeField(channelID, dataFieldOne, celsiusTemperature, writeAPIKey);
       //ThingSpeak.writeField(channelID, dataFieldTwo, rhHumidity, writeAPIKey);
       //ThingSpeak.writeField(channelID, dataFieldThree, fahrenheitTemperature, writeAPIKey);
       // write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
-
+      
       ThingSpeak.setField( 1, celsiusTemperature );
-      ThingSpeak.setField( 2, rhHumidity );
+      ThingSpeak.setField( 2, rhHumidity );    
       ThingSpeak.setField( 3, digitalRead(RELAY1));
       int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
       Serial.println(writeSuccess);
@@ -610,7 +611,7 @@ void sendThingSpeak()
   send2thingspeak = true;
 }
 
-void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
+void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen) 
 {
     Serial.print("Incoming message --> ");
     msg[msglen] = '\0';
@@ -626,9 +627,10 @@ void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
 }
 
 
-void onConnected(char *attribute, uint8_t* msg, unsigned int msglen)
+void onConnected(char *attribute, uint8_t* msg, unsigned int msglen) 
 {
     Serial.println("Connected to NETPIE...");
     microgear.setAlias(ALIAS);
     microgear.subscribe(me);
 }
+
