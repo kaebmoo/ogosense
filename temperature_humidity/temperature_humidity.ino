@@ -109,6 +109,9 @@ const long interval = 2000;
 int ledState = LOW;
 unsigned long previousMillis = 0;
 
+const unsigned long onPeriod = 5L * 60L * 1000L;
+const unsigned long standbyPeriod = 60L * 1000L;
+
 //flag for saving data
 bool shouldSaveConfig = false;
 
@@ -346,7 +349,7 @@ void loop() {
       Serial.println("Option: Temperature & Humidity");
       if (tempon == true && humion == true) {
         if (RelayEvent == false) {
-          afterStart = t_relay.after(30 * 1000, turnoff);
+          afterStart = t_relay.after(onPeriod, turnoff);
           Serial.println("On Timer Start.");
           RelayEvent = true;
           digitalWrite(RELAY1, HIGH);
@@ -364,7 +367,7 @@ void loop() {
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
         // delay start
         if (RelayEvent == true && afterStop == -1) {
-            afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
+            afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
             Serial.println("Timer Delay Start");
         }
       }
@@ -373,7 +376,7 @@ void loop() {
       Serial.println("Option: Temperature");
       if (tempon == true) {
         if (RelayEvent == false) {
-          afterStart = t_relay.after(30 * 1000, turnoff);
+          afterStart = t_relay.after(onPeriod, turnoff);
           Serial.println("On Timer Start.");
           RelayEvent = true;
           digitalWrite(RELAY1, HIGH);
@@ -391,7 +394,7 @@ void loop() {
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
         // delay start
         if (RelayEvent == true && afterStop == -1) {
-            afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
+            afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
             Serial.println("Timer Delay Start");
         }
 
@@ -401,7 +404,7 @@ void loop() {
       Serial.println("Option: Humidity");
       if (humion == true) {
         if (RelayEvent == false) {
-          afterStart = t_relay.after(30 * 1000, turnoff);
+          afterStart = t_relay.after(onPeriod, turnoff);
           Serial.println("On Timer Start.");
           RelayEvent = true;
           digitalWrite(RELAY1, HIGH);
@@ -419,7 +422,7 @@ void loop() {
         digitalWrite(LED_BUILTIN, HIGH);  // turn off
         // delay start
         if (RelayEvent == true && afterStop == -1) {
-            afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
+            afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
             Serial.println("Timer Delay Start");
         }
       }
@@ -490,7 +493,7 @@ void loop() {
 
 void turnoff()
 {
-  afterStop = t_delayStart.after(5 * 1000, delayStart);   // 10 * 60 * 1000 = 10 minutes
+  afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
   digitalWrite(RELAY1, LOW);
   Serial.println("Timer Stop: RELAY1 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
