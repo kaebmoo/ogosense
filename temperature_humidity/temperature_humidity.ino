@@ -46,9 +46,10 @@ SOFTWARE.
 #define APPID   "OgoSense"
 #define KEY     "sYZknE19LHxr1zJ"
 #define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ"
-#define ALIAS   "OgoSense0001"
-char *me = "/nid/0000001";
-char *mystatus = "/nid/0000001/status";
+
+#define ALIAS   "OgoSense0002"
+char *me = "/nid/0000002";
+char *mystatus = "/nid/0000002/status";
 
 const int chipSelect = D8; // SD CARD
 
@@ -77,7 +78,7 @@ char t_setpoint[6] = "30";
 char t_range[6] = "4";
 char h_setpoint[6] = "60";
 char h_range[6] = "20";
-char c_options[6] = "";
+char c_options[6] = "1";
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 
@@ -91,8 +92,8 @@ int options = 0;
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
 unsigned long channelID = 414252;
-char *readAPIKey = "7SGL05KU9TXSUD2N";
-char *writeAPIKey = "IVDCJXLE6GUKW41L";
+char *readAPIKey = "GMR57JSZ8CJQ7SZ5";
+char *writeAPIKey = "AJYK171U71CD1AJ6";
 const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
 
 unsigned int dataFieldFour = 4;                            // Field to write temperature C data
@@ -109,7 +110,7 @@ const long interval = 2000;
 int ledState = LOW;
 unsigned long previousMillis = 0;
 
-const unsigned long onPeriod = 5L * 60L * 1000L;
+const unsigned long onPeriod = 60L * 60L * 1000L;
 const unsigned long standbyPeriod = 60L * 1000L;
 
 //flag for saving data
@@ -160,6 +161,27 @@ void setup() {
   Serial.print("Option : ");
   Serial.println(options);
 
+  if (temperature_setpoint > 100 || temperature_setpoint < 0) {
+    temperature_setpoint = 30;
+    shouldSaveConfig = true;
+  }
+  if (temperature_range > 100 || temperature_range < 0) {
+    temperature_range = 4;
+    shouldSaveConfig = true;
+  }
+  if (humidity_setpoint > 100 || humidity_setpoint < 0) {
+    humidity_setpoint = 60;
+    shouldSaveConfig = true;
+  }
+  if (humidity_range > 100 || humidity_range < 0) {
+    humidity_range = 20;
+    shouldSaveConfig = true;
+  }
+  if (options > 2 || options < 0) {
+    options = 1;
+    shouldSaveConfig = true;
+  }
+
   WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint", t_setpoint, 6);
   WiFiManagerParameter custom_t_range("t_range", "temperature range", t_range, 6);
   WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint", h_setpoint, 6);
@@ -208,7 +230,11 @@ void setup() {
 
     //if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
-
+    Serial.print(me);
+    Serial.print("\t");
+    Serial.print(ALIAS);
+    Serial.print("\t");
+    Serial.println(mystatus);
 
     if (shouldSaveConfig) {
       strcpy(t_setpoint, custom_t_setpoint.getValue());
