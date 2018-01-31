@@ -43,57 +43,60 @@ SOFTWARE.
 
 #include <MicroGear.h>
 
-#define APPID   "OgoSense"
-#define KEY     "sYZknE19LHxr1zJ"
-#define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ"
+#define APPID   "OgoSense"                  // application id from netpie
+#define KEY     "sYZknE19LHxr1zJ"           // key from netpie
+#define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
 
-#define ALIAS   "OgoSense0002"
-char *me = "/nid/0000002";
-char *mystatus = "/nid/0000002/status";
+#define ALIAS   "OgoSense0000"              // alias name netpie
+char *me = "/nid/0000000";                  // topic set for sensor box
+char *mystatus = "/nid/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
 
 const int chipSelect = D8; // SD CARD
 
 const int CLK = D6; //Set the CLK pin connection to the display
 const int DIO = D5; //Set the DIO pin connection to the display
-const int analogReadPin = A0;
-const int RELAY1 = D0;
-const int LED = D4;
-const int RELAY2 = D7;
+const int analogReadPin = A0;               // read for set options use R for voltage divide
+const int RELAY1 = D0;                      // ouput for control relay
+const int LED = D4;                         // output for LED (toggle) buildin LED board
+const int RELAY2 = D7;                      // ouput for second relay
 
 TM1637Display display(CLK, DIO); //set up the 4-Digit Display.
-SHT3X sht30(0x45);
+SHT3X sht30(0x45);                          // address sensor
 
 float maxtemp = 30.0;
 float mintemp = 26.0;
 float maxhumidity = 60.0;
 float minhumidity = 40.0;
 
-float temperature_setpoint = 30.0;  // 22.0 - 18.0 C
-float temperature_range = 4.0;
+float temperature_setpoint = 30.0;  // 30.0 set point
+float temperature_range = 4.0;      // +- 4.0 from set point
 
-float humidity_setpoint = 60.0;     // 60 - 40 RH %
-float humidity_range = 20;
+float humidity_setpoint = 60.0;     // 60 set point RH %
+float humidity_range = 20;          // +- 20 from set point
 
+// set for wifimanager to get value from user
 char t_setpoint[6] = "30";
 char t_range[6] = "4";
 char h_setpoint[6] = "60";
 char h_range[6] = "20";
 char c_options[6] = "1";
+char c_cool[6] = "1";
+char c_moisture[6] = "0";
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 
-boolean COOL = true;  // true > set point, false < set point = HEAT mode
-boolean MOISTURE = false; // true < set point; false > set point
-boolean tempon = false;
-boolean humion = false;
+int COOL = 1;        // true > set point, false < set point = HEAT mode
+int MOISTURE = 0;   // true < set point; false > set point
+boolean tempon = false;     // flag ON/OFF
+boolean humion = false;     // flag ON/OFF
 
-int options = 0;
+int options = 0;            // option : 0 = humidity only, 1 = temperature only, 2 = temperature & humidiy
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 414252;
-char *readAPIKey = "GMR57JSZ8CJQ7SZ5";
-char *writeAPIKey = "AJYK171U71CD1AJ6";
+unsigned long channelID = 411029;
+char *readAPIKey = "YMT3SYCTNWTF4ZVP";
+char *writeAPIKey = "C3H5WESZ8BIVPVHJ";
 const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
 
 unsigned int dataFieldFour = 4;                            // Field to write temperature C data
@@ -103,6 +106,7 @@ unsigned int dataFieldTwo = 2;                       // Field to write relative 
 unsigned int dataFieldThree = 3;                     // Field to write temperature F data
 unsigned long lastConnectionTime = 0;
 long lastUpdateTime = 0;
+
 WiFiClient client;
 MicroGear microgear(client);
 
@@ -110,13 +114,13 @@ const long interval = 2000;
 int ledState = LOW;
 unsigned long previousMillis = 0;
 
-const unsigned long onPeriod = 60L * 60L * 1000L;
-const unsigned long standbyPeriod = 60L * 1000L;
+const unsigned long onPeriod = 60L * 60L * 1000L;     // ON relay period minute * second * milli second
+const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for relay
 
 //flag for saving data
 bool shouldSaveConfig = false;
 
-Timer t_relay, t_delayStart, timer_delaysend;
+Timer t_relay, t_delayStart, timer_delaysend;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
@@ -137,18 +141,23 @@ void setup() {
 
   // put your setup code here, to run once:
 
-  /* Event listener */
+  /* setup netpie call back */
   microgear.on(MESSAGE,onMsghandler);
   microgear.on(CONNECTED,onConnected);
   microgear.setEEPROMOffset(48);
 
   Serial.begin(115200);
+
+  // read config from eeprom
   EEPROM.begin(512);
   humidity_setpoint = (float) eeGetInt(0);
   humidity_range = (float) eeGetInt(4);
   temperature_setpoint = (float) eeGetInt(8);
   temperature_range = (float) eeGetInt(12);
   options = eeGetInt(16);
+  COOL = eeGetInt(20);
+  MOISTURE = eeGetInt(24);
+
   Serial.println();
   Serial.print("Temperature : ");
   Serial.println(temperature_setpoint);
@@ -160,6 +169,10 @@ void setup() {
   Serial.println(humidity_range);
   Serial.print("Option : ");
   Serial.println(options);
+  Serial.print("COOL : ");
+  Serial.println(COOL);
+  Serial.print("MOISTURE : ");
+  Serial.println(MOISTURE);
 
   if (temperature_setpoint > 100 || temperature_setpoint < 0) {
     temperature_setpoint = 30;
@@ -181,12 +194,23 @@ void setup() {
     options = 1;
     shouldSaveConfig = true;
   }
+  if (COOL > 1 || COOL < 0) {
+    COOL = 1;
+    shouldSaveConfig = true;
+  }
+  if (MOISTURE > 1 || MOISTURE < 0) {
+    MOISTURE = 0;
+    shouldSaveConfig = true;
+  }
+
 
   WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint", t_setpoint, 6);
   WiFiManagerParameter custom_t_range("t_range", "temperature range", t_range, 6);
   WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint", h_setpoint, 6);
   WiFiManagerParameter custom_h_range("h_range", "humidity range", h_range, 6);
-  WiFiManagerParameter custom_c_options("c_options", "option", c_options, 6);
+  WiFiManagerParameter custom_c_options("c_options", "OPTION", c_options, 6);
+  WiFiManagerParameter custom_c_cool("c_cool", "COOL", c_cool, 6);
+  WiFiManagerParameter custom_c_moisture("c_moisture", "MOISTURE", c_moisture, 6);
 
 
     //WiFiManager
@@ -202,6 +226,9 @@ void setup() {
     wifiManager.addParameter(&custom_h_setpoint);
     wifiManager.addParameter(&custom_h_range);
     wifiManager.addParameter(&custom_c_options);
+    wifiManager.addParameter(&custom_c_cool);
+    wifiManager.addParameter(&custom_c_moisture);
+
 
     //reset saved settings
     //wifiManager.resetSettings();
@@ -242,6 +269,8 @@ void setup() {
       strcpy(h_setpoint, custom_h_setpoint.getValue());
       strcpy(h_range, custom_h_range.getValue());
       strcpy(c_options, custom_c_options.getValue());
+      strcpy(c_cool, custom_c_cool.getValue());
+      strcpy(c_moisture, custom_c_moisture.getValue());
 
       Serial.print("Temperature : ");
       Serial.println(t_setpoint);
@@ -253,18 +282,26 @@ void setup() {
       Serial.println(h_range);
       Serial.print("Option : ");
       Serial.println(c_options);
+      Serial.print("COOL : ");
+      Serial.println(COOL);
+      Serial.print("MOISTURE : ");
+      Serial.println(MOISTURE);
 
       temperature_setpoint = atol(t_setpoint);
       temperature_range = atol(t_range);
       humidity_setpoint = atol(h_setpoint);
       humidity_range = atol(h_range);
       options = atoi(c_options);
+      COOL = atoi(c_cool);
+      MOISTURE = atoi(c_moisture);
 
       eeWriteInt(0, atoi(h_setpoint));
       eeWriteInt(4, atoi(h_range));
       eeWriteInt(8, atoi(t_setpoint));
       eeWriteInt(12, atoi(t_range));
       eeWriteInt(16, options);
+      eeWriteInt(20, COOL);
+      eeWriteInt(24, MOISTURE);
     }
 
     ThingSpeak.begin( client );
@@ -460,7 +497,7 @@ void loop() {
     Serial.println(humion);
     // Serial.println();
 
-    
+
 
     // Only update if posting time is exceeded
     unsigned long currentMillis = millis();
@@ -510,7 +547,7 @@ void loop() {
     microgear.connect(APPID);
   }
   Serial.println();
-  
+
   t_relay.update();
   t_delayStart.update();
   timer_delaysend.update();
