@@ -109,7 +109,7 @@ int COOL = 1;        // true > set point, false < set point = HEAT mode
 int MOISTURE = 0;   // true < set point; false > set point
 boolean tempon = false;     // flag ON/OFF
 boolean humion = false;     // flag ON/OFF
-boolean AUTO = false;       // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
+boolean AUTO = true;       // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
 
 int options = 0;            // option : 0 = humidity only, 1 = temperature only, 2 = temperature & humidiy
 
@@ -122,11 +122,12 @@ int ledState = LOW;
 unsigned long previousMillis = 0;
 
 const unsigned long onPeriod = 60L * 60L * 1000L;     // ON relay period minute * second * milli second
-const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for relay
+const unsigned long standbyPeriod = 5L * 1000L;      // delay start timer for relay
 
 //flag for saving data
 bool shouldSaveConfig = false;
 
+BlynkTimer blynktimer;
 Timer t_relay, t_delayStart, timer_delaysend;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
@@ -324,14 +325,25 @@ void setup() {
 
     Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
     Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+    // Setup a function to be called every second
+    blynktimer.setInterval(1000L, sendSensor);
+
+    if (digitalRead(RELAY1) == LOW) {
+      led1.off();
+    }
+    else if (digitalRead(RELAY1) == HIGH) {
+      led1.on();
+    }
 }
 
 void loop() {
 
   blink();
 
-  temp_humi_sensor();
-
+  if(AUTO) {
+    temp_humi_sensor();
+  }
+  sendThingSpeak();
   /*
    * netpie connect
    *
@@ -353,6 +365,7 @@ void loop() {
   timer_delaysend.update();
 
   Blynk.run();
+  blynktimer.run();
 
 }
 
@@ -512,43 +525,18 @@ void temp_humi_sensor()
     Serial.print("tempon = ");
     Serial.print(tempon);
     Serial.print(" humion = ");
-    Serial.println(humion);
+    Serial.print(humion);
+    Serial.print(" RelayEvent = ");
+    Serial.print(RelayEvent);
+    Serial.print(" afterStart = ");
+    Serial.print(afterStart);
+    Serial.print(" afterStop = ");
+    Serial.println(afterStop);
+    
     // Serial.println();
 
 
 
-    // Only update if posting time is exceeded
-    unsigned long currentMillis = millis();
-    if (currentMillis - lastUpdateTime >=  postingInterval) {
-      lastUpdateTime = currentMillis;
-
-      float fahrenheitTemperature, celsiusTemperature;
-      float rhHumidity;
-
-      fahrenheitTemperature = sht30.fTemp;
-      celsiusTemperature = sht30.cTemp;
-      rhHumidity = sht30.humidity;
-
-      Serial.print(celsiusTemperature);
-      Serial.print(", ");
-      Serial.print(fahrenheitTemperature);
-      Serial.print(", ");
-      Serial.print(rhHumidity);
-      Serial.println();
-      Serial.print("Sending data to ThingSpeak : ");
-
-      //ThingSpeak.writeField(channelID, dataFieldOne, celsiusTemperature, writeAPIKey);
-      //ThingSpeak.writeField(channelID, dataFieldTwo, rhHumidity, writeAPIKey);
-      //ThingSpeak.writeField(channelID, dataFieldThree, fahrenheitTemperature, writeAPIKey);
-      // write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
-
-      ThingSpeak.setField( 1, celsiusTemperature );
-      ThingSpeak.setField( 2, rhHumidity );
-      ThingSpeak.setField( 3, digitalRead(RELAY1));
-      int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
-      Serial.println(writeSuccess);
-      Serial.println();
-    }
   }
   else
   {
@@ -580,19 +568,19 @@ void segment_display()
 }
 
 void turnrelay_onoff(uint8_t value)
-{
-  if(AUTO) {
+{  
     if (value == HIGH) {
       digitalWrite(RELAY1, HIGH);
       Serial.println("RELAY1 ON");
       digitalWrite(LED_BUILTIN, LOW);  // turn on
+      led1.on();
     }
     else if (value == LOW) {
       digitalWrite(RELAY1, LOW);
       Serial.println("RELAY1 OFF");
       digitalWrite(LED_BUILTIN, HIGH);  // turn off
+      led1.off();
     }
-  }
 }
 
 void turnoff()
@@ -714,6 +702,43 @@ void blink()
 void sendThingSpeak()
 {
   send2thingspeak = true;
+
+  if(sht30.get()==0) {
+    // Only update if posting time is exceeded
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastUpdateTime >=  postingInterval) {
+      lastUpdateTime = currentMillis;
+  
+      float fahrenheitTemperature, celsiusTemperature;
+      float rhHumidity;
+  
+      fahrenheitTemperature = sht30.fTemp;
+      celsiusTemperature = sht30.cTemp;
+      rhHumidity = sht30.humidity;
+  
+      Serial.print(celsiusTemperature);
+      Serial.print(", ");
+      Serial.print(fahrenheitTemperature);
+      Serial.print(", ");
+      Serial.print(rhHumidity);
+      Serial.println();
+      Serial.print("Sending data to ThingSpeak : ");
+  
+      //ThingSpeak.writeField(channelID, dataFieldOne, celsiusTemperature, writeAPIKey);
+      //ThingSpeak.writeField(channelID, dataFieldTwo, rhHumidity, writeAPIKey);
+      //ThingSpeak.writeField(channelID, dataFieldThree, fahrenheitTemperature, writeAPIKey);
+      // write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
+  
+      ThingSpeak.setField( 1, celsiusTemperature );
+      ThingSpeak.setField( 2, rhHumidity );
+      ThingSpeak.setField( 3, digitalRead(RELAY1));
+      int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
+      Serial.println(writeSuccess);
+      Serial.println();
+    }
+  }
+
+  
 }
 
 void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
@@ -749,12 +774,31 @@ BLYNK_WRITE(V1)
     buzzer_sound();
     led1.on();
     digitalWrite(RELAY1, HIGH);
+    RelayEvent = true;
   }
   else {
     buzzer_sound();
     led1.off();
     digitalWrite(RELAY1, LOW);
+    if (afterStart != -1) {
+          t_relay.stop(afterStart);
+
+    }
+    if (afterStop != -1) {
+      t_delayStart.stop(afterStop);
+    }
+
+    RelayEvent = false;
+    afterStart = -1;
+    afterStop = -1;
+    
   }
+  Serial.print(" RelayEvent = ");
+  Serial.print(RelayEvent);
+  Serial.print(" afterStart = ");
+  Serial.print(afterStart);
+  Serial.print(" afterStop = ");
+  Serial.println(afterStop);
 
 }
 
@@ -763,10 +807,37 @@ BLYNK_WRITE(V2)
   int pinValue = param.asInt();
   if (pinValue == 1) {
     AUTO = true;
+    Serial.print("AUTO Mode : ");
+    Serial.println(AUTO);
   }
   else {
     AUTO = false;
+    Serial.print("AUTO Mode : ");
+    Serial.println(AUTO);
   }
+}
+
+// This function sends Arduino's up time every second to Virtual Pin (5).
+// In the app, Widget's reading frequency should be set to PUSH. This means
+// that you define how often to send data to Blynk App.
+void sendSensor()
+{
+  float h = sht30.humidity;
+  float t = sht30.cTemp;
+  char str[5] = "";
+
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from sensor!");
+    return;
+  }
+  dtostrf(t, 4, 1, str);
+  // You can send any value at any time.
+  // Please don't send more that 10 values per second.
+
+  Blynk.virtualWrite(V5, str);
+  Blynk.virtualWrite(V6, (int) h);
+  Blynk.virtualWrite(V7, str);
+  Blynk.virtualWrite(V8, (int) h);
 }
 
 void reconnectBlynk() {
