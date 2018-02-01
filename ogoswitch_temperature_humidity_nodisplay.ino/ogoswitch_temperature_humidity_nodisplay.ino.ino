@@ -109,6 +109,7 @@ int COOL = 1;        // true > set point, false < set point = HEAT mode
 int MOISTURE = 0;   // true < set point; false > set point
 boolean tempon = false;     // flag ON/OFF
 boolean humion = false;     // flag ON/OFF
+boolean AUTO = false;       // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
 
 int options = 0;            // option : 0 = humidity only, 1 = temperature only, 2 = temperature & humidiy
 
@@ -329,7 +330,10 @@ void loop() {
 
   blink();
 
-  // temp_humi_sensor();
+  if (AUTO) {
+    temp_humi_sensor();
+  }
+  
   /*
    * netpie connect
    * 
@@ -745,6 +749,17 @@ BLYNK_WRITE(V1)
     digitalWrite(RELAY1, LOW);
   }
   
+}
+
+BLYNK_WRITE(V2)
+{
+  int pinValue = param.asInt();
+  if (pinValue == 1) {
+    AUTO = true;
+  }
+  else {
+    AUTO = false;
+  }
 }
 
 void reconnectBlynk() {
