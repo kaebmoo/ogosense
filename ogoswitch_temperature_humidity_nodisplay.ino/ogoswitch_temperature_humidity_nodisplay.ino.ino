@@ -39,9 +39,7 @@ SOFTWARE.
 #include <TM1637Display.h>
 
 #include <EEPROM.h>
-
 #include <Timer.h>
-
 #include <MicroGear.h>
 
 #define APPID   "OgoSense"                  // application id from netpie
@@ -52,18 +50,35 @@ String ALIAS = "OgoSense0000";              // alias name netpie
 char *me = "/mam/0000000";                  // topic set for sensor box
 char *mystatus = "/mam/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
 
-const int chipSelect = D8; // SD CARD
+// ThingSpeak information
+char thingSpeakAddress[] = "api.thingspeak.com";
+unsigned long channelID = 360709;
+char *readAPIKey = "GNZ8WEU763Z5DUEA";
+char *writeAPIKey = "8M07EYX8NPCD9V8U";
+const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
 
+unsigned int dataFieldFour = 4;                            // Field to write temperature C data
+unsigned int dataFieldFive = 5;
+unsigned int dataFieldOne = 1;
+unsigned int dataFieldTwo = 2;                       // Field to write relative humidity data
+unsigned int dataFieldThree = 3;                     // Field to write temperature F data
+unsigned long lastConnectionTime = 0;
+long lastUpdateTime = 0;
+
+// You should get Auth Token in the Blynk App.
+// Go to the Project Settings (nut icon).
+char auth[] = "27092c0fc50343bc917a97c755012c9b";
+
+WidgetLED led1(10); //virtual led 
+const int chipSelect = D8; // SD CARD
 const int CLK = D6; //Set the CLK pin connection to the display
-const int DIO = D5; //Set the DIO pin connection to the display
+const int DIO = D3; //Set the DIO pin connection to the display
 
 const int buzzer=D5; //Buzzer control port, default D5
-
 const int analogReadPin = A0;               // read for set options use R for voltage divide
-
-const int RELAY1 = D0;                      // ouput for control relay
+const int RELAY1 = D7;                      // ouput for control relay
 const int LED = D4;                         // output for LED (toggle) buildin LED board
-const int RELAY2 = D7;                      // ouput for second relay
+// const int RELAY2 = D7;                      // ouput for second relay
 
 TM1637Display display(CLK, DIO); //set up the 4-Digit Display.
 SHT3X sht30(0x45);                          // address sensor
@@ -97,20 +112,6 @@ boolean humion = false;     // flag ON/OFF
 
 int options = 0;            // option : 0 = humidity only, 1 = temperature only, 2 = temperature & humidiy
 
-// ThingSpeak information
-char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 360709;
-char *readAPIKey = "GNZ8WEU763Z5DUEA";
-char *writeAPIKey = "8M07EYX8NPCD9V8U";
-const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
-
-unsigned int dataFieldFour = 4;                            // Field to write temperature C data
-unsigned int dataFieldFive = 5;
-unsigned int dataFieldOne = 1;
-unsigned int dataFieldTwo = 2;                       // Field to write relative humidity data
-unsigned int dataFieldThree = 3;                     // Field to write temperature F data
-unsigned long lastConnectionTime = 0;
-long lastUpdateTime = 0;
 
 WiFiClient client;
 MicroGear microgear(client);
@@ -141,6 +142,7 @@ void setup() {
   pinMode(LED, OUTPUT);
   pinMode(analogReadPin, INPUT);
   pinMode(RELAY1, OUTPUT);
+  digitalWrite(RELAY1, LOW);
   display.setBrightness(0x0a); //set the diplay to maximum brightness
   Serial.println("starting");
   options = analogRead(analogReadPin);
@@ -316,14 +318,45 @@ void setup() {
     ThingSpeak.begin( client );
 
     // microgear.useTLS(true);
-    microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
-    microgear.connect(APPID);
+    // microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
+    // microgear.connect(APPID);
 
-    //Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
-    //Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+    Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
+    Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
 }
 
 void loop() {
+
+  blink();
+
+  // temp_humi_sensor();
+  /*
+   * netpie connect
+   * 
+  if (microgear.connected()) {
+    microgear.loop();
+    Serial.println("publish to netpie");
+    microgear.publish(mystatus, digitalRead(RELAY1), true);
+  }
+  else {
+    Serial.println("connection lost, reconnect...");
+    microgear.connect(APPID);
+  }
+  */
+  
+  Serial.println();
+
+  t_relay.update();
+  t_delayStart.update();
+  timer_delaysend.update();
+
+  Blynk.run();
+
+}
+
+void temp_humi_sensor()
+{
+  
   /*
   options = analogRead(analogReadPin);
   Serial.print("Analog Read : ");
@@ -339,7 +372,7 @@ void loop() {
 
   Serial.print("\tOptions : ");
   Serial.println(options);
-
+  
   if(sht30.get()==0){
     Serial.print("Temperature in Celsius : ");
     Serial.print(sht30.cTemp);
@@ -355,29 +388,6 @@ void loop() {
     Serial.print(humidity_setpoint);
     Serial.print("\trange : ");
     Serial.println(humidity_range);
-
-
-    float tempdisplay = sht30.cTemp * 10;
-
-    //  gfedcba
-    // 00111001 = 0011 1001 = 0x39 = C
-
-    uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };
-    display.setSegments(data);
-    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    delay(2000);
-
-    blink();
-
-    // 0x76 = H
-    data[0] = 0x00;
-    data[1] = 0x00;
-    data[2] = 0x00;
-    data[3] = 0x76;
-    display.setSegments(data);
-    tempdisplay = sht30.humidity * 10;
-    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    delay(2000);
 
 
     if (MOISTURE) {
@@ -548,24 +558,29 @@ void loop() {
   {
     Serial.println("Sensor Error!");
   }
+}
 
-  if (microgear.connected()) {
-    microgear.loop();
-    Serial.println("publish to netpie");
-    microgear.publish(mystatus, digitalRead(RELAY1), true);
-  }
-  else {
-    Serial.println("connection lost, reconnect...");
-    microgear.connect(APPID);
-  }
-  Serial.println();
+void segment_display()
+{
+    float tempdisplay = sht30.cTemp * 10;
 
-  t_relay.update();
-  t_delayStart.update();
-  timer_delaysend.update();
+    //  gfedcba
+    // 00111001 = 0011 1001 = 0x39 = C
 
-  // Blynk.run();
+    uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };
+    display.setSegments(data);
+    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
+    delay(2000);   
 
+    // 0x76 = H
+    data[0] = 0x00;
+    data[1] = 0x00;
+    data[2] = 0x00;
+    data[3] = 0x76;
+    display.setSegments(data);
+    tempdisplay = sht30.humidity * 10;
+    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
+    delay(2000);
 }
 
 void turnoff()
@@ -719,8 +734,17 @@ BLYNK_WRITE(V1)
 
   // process received value
   Serial.println(pinValue);
-  if (pinValue == 1)
+  if (pinValue == 1) {
     buzzer_sound();
+    led1.on();
+    digitalWrite(RELAY1, HIGH);
+  }
+  else {
+    buzzer_sound();
+    led1.off();
+    digitalWrite(RELAY1, LOW);
+  }
+  
 }
 
 void reconnectBlynk() {
