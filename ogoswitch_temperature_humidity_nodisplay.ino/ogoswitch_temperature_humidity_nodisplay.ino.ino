@@ -69,7 +69,7 @@ long lastUpdateTime = 0;
 // Go to the Project Settings (nut icon).
 char auth[] = "27092c0fc50343bc917a97c755012c9b";
 
-WidgetLED led1(10); //virtual led 
+WidgetLED led1(10); //virtual led
 const int chipSelect = D8; // SD CARD
 const int CLK = D6; //Set the CLK pin connection to the display
 const int DIO = D3; //Set the DIO pin connection to the display
@@ -268,7 +268,7 @@ void setup() {
     //if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
 
-    ALIAS = "OgoSense-"+String(ESP.getChipId()); 
+    ALIAS = "OgoSense-"+String(ESP.getChipId());
     Serial.print(me);
     Serial.print("\t");
     Serial.print(ALIAS);
@@ -330,13 +330,11 @@ void loop() {
 
   blink();
 
-  if (AUTO) {
-    temp_humi_sensor();
-  }
-  
+  temp_humi_sensor();
+
   /*
    * netpie connect
-   * 
+   *
   if (microgear.connected()) {
     microgear.loop();
     Serial.println("publish to netpie");
@@ -347,7 +345,7 @@ void loop() {
     microgear.connect(APPID);
   }
   */
-  
+
   Serial.println();
 
   t_relay.update();
@@ -360,7 +358,7 @@ void loop() {
 
 void temp_humi_sensor()
 {
-  
+
   /*
   options = analogRead(analogReadPin);
   Serial.print("Analog Read : ");
@@ -376,7 +374,7 @@ void temp_humi_sensor()
 
   Serial.print("\tOptions : ");
   Serial.println(options);
-  
+
   if(sht30.get()==0){
     Serial.print("Temperature in Celsius : ");
     Serial.print(sht30.cTemp);
@@ -441,9 +439,8 @@ void temp_humi_sensor()
           afterStart = t_relay.after(onPeriod, turnoff);
           Serial.println("On Timer Start.");
           RelayEvent = true;
-          digitalWrite(RELAY1, HIGH);
-          Serial.println("RELAY1 ON");
-          digitalWrite(LED_BUILTIN, LOW);  // turn on
+          turnrelay_onoff(HIGH);
+
         }
       }
       else if (tempon == false && humion == false) {
@@ -451,9 +448,8 @@ void temp_humi_sensor()
           t_relay.stop(afterStart);
           afterStart = -1;
         }
-        digitalWrite(RELAY1, LOW);
-        Serial.println("RELAY1 OFF");
-        digitalWrite(LED_BUILTIN, HIGH);  // turn off
+        turnrelay_onoff(LOW);
+
         // delay start
         if (RelayEvent == true && afterStop == -1) {
             afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
@@ -468,9 +464,8 @@ void temp_humi_sensor()
           afterStart = t_relay.after(onPeriod, turnoff);
           Serial.println("On Timer Start.");
           RelayEvent = true;
-          digitalWrite(RELAY1, HIGH);
-          Serial.println("RELAY1 ON");
-          digitalWrite(LED_BUILTIN, LOW);  // turn on
+          turnrelay_onoff(HIGH);
+
         }
       }
       else if (tempon == false) {
@@ -478,9 +473,8 @@ void temp_humi_sensor()
           t_relay.stop(afterStart);
           afterStart = -1;
         }
-        digitalWrite(RELAY1, LOW);
-        Serial.println("RELAY1 OFF");
-        digitalWrite(LED_BUILTIN, HIGH);  // turn off
+        turnrelay_onoff(LOW);
+
         // delay start
         if (RelayEvent == true && afterStop == -1) {
             afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
@@ -496,9 +490,8 @@ void temp_humi_sensor()
           afterStart = t_relay.after(onPeriod, turnoff);
           Serial.println("On Timer Start.");
           RelayEvent = true;
-          digitalWrite(RELAY1, HIGH);
-          Serial.println("RELAY1 ON");
-          digitalWrite(LED_BUILTIN, LOW);  // turn on
+          turnrelay_onoff(HIGH);
+
         }
       }
       else if (humion == false) {
@@ -506,9 +499,8 @@ void temp_humi_sensor()
           t_relay.stop(afterStart);
           afterStart = -1;
         }
-        digitalWrite(RELAY1, LOW);
-        Serial.println("RELAY1 OFF");
-        digitalWrite(LED_BUILTIN, HIGH);  // turn off
+        turnrelay_onoff(LOW);
+
         // delay start
         if (RelayEvent == true && afterStop == -1) {
             afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
@@ -574,7 +566,7 @@ void segment_display()
     uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };
     display.setSegments(data);
     display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    delay(2000);   
+    delay(2000);
 
     // 0x76 = H
     data[0] = 0x00;
@@ -587,12 +579,27 @@ void segment_display()
     delay(2000);
 }
 
+void turnrelay_onoff(uint8_t value)
+{
+  if(AUTO) {
+    if (value == HIGH) {
+      digitalWrite(RELAY1, HIGH);
+      Serial.println("RELAY1 ON");
+      digitalWrite(LED_BUILTIN, LOW);  // turn on
+    }
+    else if (value == LOW) {
+      digitalWrite(RELAY1, LOW);
+      Serial.println("RELAY1 OFF");
+      digitalWrite(LED_BUILTIN, HIGH);  // turn off
+    }
+  }
+}
+
 void turnoff()
 {
   afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
-  digitalWrite(RELAY1, LOW);
+  turnrelay_onoff(LOW);
   Serial.println("Timer Stop: RELAY1 OFF");
-  digitalWrite(LED_BUILTIN, HIGH);  // turn off
   afterStart = -1;
 }
 
@@ -748,7 +755,7 @@ BLYNK_WRITE(V1)
     led1.off();
     digitalWrite(RELAY1, LOW);
   }
-  
+
 }
 
 BLYNK_WRITE(V2)
