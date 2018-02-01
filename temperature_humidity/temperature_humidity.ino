@@ -47,16 +47,30 @@ SOFTWARE.
 #define KEY     "sYZknE19LHxr1zJ"           // key from netpie
 #define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
 
-#define ALIAS   "OgoSense0000"              // alias name netpie
-char *me = "/nid/0000000";                  // topic set for sensor box
-char *mystatus = "/nid/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
+String ALIAS = "OgoSense0000";              // alias name netpie
+char *me = "/nid/0000004";                  // topic set for sensor box
+char *mystatus = "/nid/0000004/status";     // topic status "1" or "0", "ON" or "OFF"
+
+// ThingSpeak information
+char thingSpeakAddress[] = "api.thingspeak.com";
+unsigned long channelID = 415032;
+char *readAPIKey = "LS3O2U5LR8F6YP7O";
+char *writeAPIKey = "8GD5Q9E18LRCGBCK";
+const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
+
+unsigned int dataFieldFour = 4;                            // Field to write temperature C data
+unsigned int dataFieldFive = 5;
+unsigned int dataFieldOne = 1;
+unsigned int dataFieldTwo = 2;                       // Field to write relative humidity data
+unsigned int dataFieldThree = 3;                     // Field to write temperature F data
+unsigned long lastConnectionTime = 0;
+long lastUpdateTime = 0;
 
 const int chipSelect = D8; // SD CARD
-
 const int CLK = D6; //Set the CLK pin connection to the display
 const int DIO = D5; //Set the DIO pin connection to the display
 const int analogReadPin = A0;               // read for set options use R for voltage divide
-const int RELAY1 = D0;                      // ouput for control relay
+const int RELAY1 = D7;                      // ouput for control relay; do not use D0
 const int LED = D4;                         // output for LED (toggle) buildin LED board
 const int RELAY2 = D7;                      // ouput for second relay
 
@@ -92,20 +106,7 @@ boolean humion = false;     // flag ON/OFF
 
 int options = 0;            // option : 0 = humidity only, 1 = temperature only, 2 = temperature & humidiy
 
-// ThingSpeak information
-char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 411029;
-char *readAPIKey = "YMT3SYCTNWTF4ZVP";
-char *writeAPIKey = "C3H5WESZ8BIVPVHJ";
-const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
 
-unsigned int dataFieldFour = 4;                            // Field to write temperature C data
-unsigned int dataFieldFive = 5;
-unsigned int dataFieldOne = 1;
-unsigned int dataFieldTwo = 2;                       // Field to write relative humidity data
-unsigned int dataFieldThree = 3;                     // Field to write temperature F data
-unsigned long lastConnectionTime = 0;
-long lastUpdateTime = 0;
 
 WiFiClient client;
 MicroGear microgear(client);
@@ -134,6 +135,7 @@ void setup() {
   pinMode(LED, OUTPUT);
   pinMode(analogReadPin, INPUT);
   pinMode(RELAY1, OUTPUT);
+  digitalWrite(RELAY1, LOW);
   display.setBrightness(0x0a); //set the diplay to maximum brightness
   Serial.println("starting");
   options = analogRead(analogReadPin);
@@ -257,6 +259,8 @@ void setup() {
 
     //if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
+
+    ALIAS = "OgoSense-"+String(ESP.getChipId());
     Serial.print(me);
     Serial.print("\t");
     Serial.print(ALIAS);
@@ -307,12 +311,39 @@ void setup() {
     ThingSpeak.begin( client );
 
     // microgear.useTLS(true);
-    microgear.init(KEY,SECRET,ALIAS);
-    microgear.connect(APPID);
+    // microgear.init(KEY,SECRET,(char *) ALIAS.c_str());
+    // microgear.connect(APPID);
 }
 
 void loop() {
   /*
+   * connect to netpie
+   * 
+  if (microgear.connected()) {
+    microgear.loop();
+    Serial.println("publish to netpie");
+    microgear.publish(mystatus, digitalRead(RELAY1), true);
+  }
+  else {
+    Serial.println("connection lost, reconnect...");
+    microgear.connect(APPID);
+  }
+  */
+
+  blink();
+  temp_humi_sensor();
+  
+  Serial.println();
+
+  t_relay.update();
+  t_delayStart.update();
+  timer_delaysend.update();
+
+}
+
+void temp_humi_sensor()
+{
+    /*
   options = analogRead(analogReadPin);
   Serial.print("Analog Read : ");
   Serial.print(options);
@@ -344,29 +375,7 @@ void loop() {
     Serial.print("\trange : ");
     Serial.println(humidity_range);
 
-
-    float tempdisplay = sht30.cTemp * 10;
-
-    //  gfedcba
-    // 00111001 = 0011 1001 = 0x39 = C
-
-    uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };
-    display.setSegments(data);
-    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    delay(2000);
-
-    blink();
-
-    // 0x76 = H
-    data[0] = 0x00;
-    data[1] = 0x00;
-    data[2] = 0x00;
-    data[3] = 0x76;
-    display.setSegments(data);
-    tempdisplay = sht30.humidity * 10;
-    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    delay(2000);
-
+    // segment_display();
 
     if (MOISTURE) {
       if (sht30.humidity < humidity_setpoint) {
@@ -537,22 +546,31 @@ void loop() {
     Serial.println("Sensor Error!");
   }
 
-  if (microgear.connected()) {
-    microgear.loop();
-    Serial.println("publish to netpie");
-    microgear.publish(mystatus, digitalRead(RELAY1), true);
-  }
-  else {
-    Serial.println("connection lost, reconnect...");
-    microgear.connect(APPID);
-  }
-  Serial.println();
-
-  t_relay.update();
-  t_delayStart.update();
-  timer_delaysend.update();
-
 }
+
+void segment_display()
+{
+    float tempdisplay = sht30.cTemp * 10;
+
+    //  gfedcba
+    // 00111001 = 0011 1001 = 0x39 = C
+
+    uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };
+    display.setSegments(data);
+    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
+    delay(2000);
+
+    // 0x76 = H
+    data[0] = 0x00;
+    data[1] = 0x00;
+    data[2] = 0x00;
+    data[3] = 0x76;
+    display.setSegments(data);
+    tempdisplay = sht30.humidity * 10;
+    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
+    delay(2000);
+}
+
 
 void turnoff()
 {
@@ -695,6 +713,6 @@ void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
 void onConnected(char *attribute, uint8_t* msg, unsigned int msglen)
 {
     Serial.println("Connected to NETPIE...");
-    microgear.setAlias(ALIAS);
+    microgear.setAlias((char *) ALIAS.c_str());
     microgear.subscribe(me);
 }
