@@ -340,10 +340,10 @@ void setup() {
       led1.on();
     }
     if (AUTO) {
-      led1.on();
+      led2.on();
     }
     else {
-      led1.off();
+      led2.off();
     }
 }
 
