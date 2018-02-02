@@ -70,6 +70,10 @@ long lastUpdateTime = 0;
 char auth[] = "27092c0fc50343bc917a97c755012c9b";
 
 WidgetLED led1(10); //virtual led
+WidgetLED led2(11); // Auto status
+WidgetLED led3(12); // Box status
+
+int ledStatus = LOW;             // ledStatus used to set the LED
 const int chipSelect = D8; // SD CARD
 const int CLK = D6; //Set the CLK pin connection to the display
 const int DIO = D3; //Set the DIO pin connection to the display
@@ -117,7 +121,7 @@ int options = 0;            // option : 0 = humidity only, 1 = temperature only,
 WiFiClient client;
 MicroGear microgear(client);
 
-const long interval = 2000;
+const long interval = 1000;
 int ledState = LOW;
 unsigned long previousMillis = 0;
 
@@ -127,7 +131,7 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 //flag for saving data
 bool shouldSaveConfig = false;
 
-BlynkTimer blynktimer;
+BlynkTimer blynktimer, statustimer;
 Timer t_relay, t_delayStart, timer_delaysend;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
@@ -327,12 +331,19 @@ void setup() {
     Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
     // Setup a function to be called every second
     blynktimer.setInterval(15000L, sendSensor);
+    statustimer.setInterval(1000L, sendStatus);
     buzzer_sound();
     if (digitalRead(RELAY1) == LOW) {
       led1.off();
     }
     else if (digitalRead(RELAY1) == HIGH) {
       led1.on();
+    }
+    if (AUTO) {
+      led1.on();
+    }
+    else {
+      led1.off();
     }
 }
 
@@ -366,6 +377,7 @@ void loop() {
 
   Blynk.run();
   blynktimer.run();
+  statustimer.run();
 
 }
 
@@ -807,11 +819,13 @@ BLYNK_WRITE(V2)
   int pinValue = param.asInt();
   if (pinValue == 1) {
     AUTO = true;
+    led2.on();
     Serial.print("AUTO Mode : ");
     Serial.println(AUTO);
   }
   else {
     AUTO = false;
+    led2.off();
     Serial.print("AUTO Mode : ");
     Serial.println(AUTO);
   }
@@ -840,6 +854,17 @@ void sendSensor()
   Blynk.virtualWrite(V8, (int) h);
 }
 
+void sendStatus()
+{
+  // if the LED is off turn it on and vice-versa:
+    if (ledStatus == LOW) {
+      ledStatus = HIGH;
+      led3.on();
+    } else {
+      ledStatus = LOW;
+      led3.off();
+    }
+}
 void reconnectBlynk() {
   if (!Blynk.connected()) {
     if(Blynk.connect()) {
