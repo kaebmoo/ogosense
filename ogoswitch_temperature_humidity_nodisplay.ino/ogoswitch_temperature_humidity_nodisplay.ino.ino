@@ -326,7 +326,7 @@ void setup() {
     Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
     Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
     // Setup a function to be called every second
-    blynktimer.setInterval(1000L, sendSensor);
+    blynktimer.setInterval(15000L, sendSensor);
 
     if (digitalRead(RELAY1) == LOW) {
       led1.off();
