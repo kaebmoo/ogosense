@@ -345,6 +345,7 @@ void setup() {
     else {
       led2.off();
     }
+    // Blynk.setProperty(V1, "color", "#D3435C");
 }
 
 void loop() {
@@ -829,6 +830,16 @@ BLYNK_WRITE(V2)
     Serial.print("AUTO Mode : ");
     Serial.println(AUTO);
   }
+  
+}
+
+BLYNK_CONNECTED() 
+{
+  Blynk.syncAll();
+  // Blynk.syncVirtual(V1);
+  // Blynk.syncVirtual(V2);
+  // Blynk.virtualWrite(V1, digitalRead(RELAY1));
+  // Blynk.virtualWrite(V2, AUTO);
 }
 
 // This function sends Arduino's up time every second to Virtual Pin (5).
