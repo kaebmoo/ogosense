@@ -85,19 +85,19 @@ SHT3X sht30(0x45);                          // address sensor
 
 float maxtemp = 30.0;
 float mintemp = 26.0;
-float maxhumidity = 60.0;
+float maxhumidity = 70.0;
 float minhumidity = 40.0;
 
 float temperature_setpoint = 30.0;  // 30.0 set point
 float temperature_range = 4.0;      // +- 4.0 from set point
 
-float humidity_setpoint = 60.0;     // 60 set point RH %
+float humidity_setpoint = 70.0;     // 60 set point RH %
 float humidity_range = 20;          // +- 20 from set point
 
 // set for wifimanager to get value from user
 char t_setpoint[6] = "30";
 char t_range[6] = "4";
-char h_setpoint[6] = "60";
+char h_setpoint[6] = "70";
 char h_range[6] = "20";
 char c_options[6] = "1";
 char c_cool[6] = "1";
@@ -122,7 +122,7 @@ int ledState = LOW;
 unsigned long previousMillis = 0;
 
 const unsigned long onPeriod = 60L * 60L * 1000L;     // ON relay period minute * second * milli second
-const unsigned long standbyPeriod = 5L * 1000L;      // delay start timer for relay
+const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for relay
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -358,7 +358,7 @@ void loop() {
   }
   */
 
-  Serial.println();
+
 
   t_relay.update();
   t_delayStart.update();
@@ -532,7 +532,7 @@ void temp_humi_sensor()
     Serial.print(afterStart);
     Serial.print(" afterStop = ");
     Serial.println(afterStop);
-    
+
     // Serial.println();
 
 
@@ -568,7 +568,7 @@ void segment_display()
 }
 
 void turnrelay_onoff(uint8_t value)
-{  
+{
     if (value == HIGH) {
       digitalWrite(RELAY1, HIGH);
       Serial.println("RELAY1 ON");
@@ -708,14 +708,14 @@ void sendThingSpeak()
     unsigned long currentMillis = millis();
     if (currentMillis - lastUpdateTime >=  postingInterval) {
       lastUpdateTime = currentMillis;
-  
+
       float fahrenheitTemperature, celsiusTemperature;
       float rhHumidity;
-  
+
       fahrenheitTemperature = sht30.fTemp;
       celsiusTemperature = sht30.cTemp;
       rhHumidity = sht30.humidity;
-  
+
       Serial.print(celsiusTemperature);
       Serial.print(", ");
       Serial.print(fahrenheitTemperature);
@@ -723,12 +723,12 @@ void sendThingSpeak()
       Serial.print(rhHumidity);
       Serial.println();
       Serial.print("Sending data to ThingSpeak : ");
-  
+
       //ThingSpeak.writeField(channelID, dataFieldOne, celsiusTemperature, writeAPIKey);
       //ThingSpeak.writeField(channelID, dataFieldTwo, rhHumidity, writeAPIKey);
       //ThingSpeak.writeField(channelID, dataFieldThree, fahrenheitTemperature, writeAPIKey);
       // write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
-  
+
       ThingSpeak.setField( 1, celsiusTemperature );
       ThingSpeak.setField( 2, rhHumidity );
       ThingSpeak.setField( 3, digitalRead(RELAY1));
@@ -738,7 +738,7 @@ void sendThingSpeak()
     }
   }
 
-  
+
 }
 
 void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
@@ -791,7 +791,7 @@ BLYNK_WRITE(V1)
     RelayEvent = false;
     afterStart = -1;
     afterStop = -1;
-    
+
   }
   Serial.print(" RelayEvent = ");
   Serial.print(RelayEvent);
