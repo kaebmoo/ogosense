@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/* Comment this out to disable prints and save space */
+// #define BLYNK_DEBUG // Optional, this enables lots of prints
+// #define BLYNK_PRINT Serial
+
 
 #include <SPI.h>
 #include <SD.h>
@@ -161,7 +165,7 @@ void setup() {
   microgear.on(CONNECTED,onConnected);
   microgear.setEEPROMOffset(48);
 
-  Serial.begin(115200);
+
 
   // read config from eeprom
   EEPROM.begin(512);
@@ -332,19 +336,13 @@ void setup() {
     // Setup a function to be called every second
     blynktimer.setInterval(15000L, sendSensor);
     statustimer.setInterval(1000L, sendStatus);
+
+    digitalWrite(LED, HIGH);
+    delay(500);
+    digitalWrite(LED, LOW);
     buzzer_sound();
-    if (digitalRead(RELAY1) == LOW) {
-      led1.off();
-    }
-    else if (digitalRead(RELAY1) == HIGH) {
-      led1.on();
-    }
-    if (AUTO) {
-      led2.on();
-    }
-    else {
-      led2.off();
-    }
+    
+    
     // Blynk.setProperty(V1, "color", "#D3435C");
 }
 
@@ -474,7 +472,10 @@ void temp_humi_sensor()
           t_relay.stop(afterStart);
           afterStart = -1;
         }
-        turnrelay_onoff(LOW);
+        Serial.println("OFF");
+        if (digitalRead(RELAY1) == HIGH) {
+          turnrelay_onoff(LOW);  
+        }
 
         // delay start
         if (RelayEvent == true && afterStop == -1) {
@@ -499,7 +500,10 @@ void temp_humi_sensor()
           t_relay.stop(afterStart);
           afterStart = -1;
         }
-        turnrelay_onoff(LOW);
+        Serial.println("OFF");
+        if (digitalRead(RELAY1) == HIGH) {
+          turnrelay_onoff(LOW);  
+        }
 
         // delay start
         if (RelayEvent == true && afterStop == -1) {
@@ -525,7 +529,10 @@ void temp_humi_sensor()
           t_relay.stop(afterStart);
           afterStart = -1;
         }
-        turnrelay_onoff(LOW);
+        Serial.println("OFF");
+        if (digitalRead(RELAY1) == HIGH) {
+          turnrelay_onoff(LOW);  
+        }
 
         // delay start
         if (RelayEvent == true && afterStop == -1) {
@@ -587,12 +594,14 @@ void turnrelay_onoff(uint8_t value)
       Serial.println("RELAY1 ON");
       digitalWrite(LED_BUILTIN, LOW);  // turn on
       led1.on();
+      buzzer_sound();
     }
     else if (value == LOW) {
       digitalWrite(RELAY1, LOW);
       Serial.println("RELAY1 OFF");
       digitalWrite(LED_BUILTIN, HIGH);  // turn off
       led1.off();
+      buzzer_sound();
     }
 }
 
@@ -784,15 +793,11 @@ BLYNK_WRITE(V1)
   // process received value
   Serial.println(pinValue);
   if (pinValue == 1) {
-    buzzer_sound();
-    led1.on();
-    digitalWrite(RELAY1, HIGH);
+    turnrelay_onoff(HIGH);
     RelayEvent = true;
   }
   else {
-    buzzer_sound();
-    led1.off();
-    digitalWrite(RELAY1, LOW);
+    turnrelay_onoff(LOW);
     if (afterStart != -1) {
           t_relay.stop(afterStart);
 
@@ -830,11 +835,12 @@ BLYNK_WRITE(V2)
     Serial.print("AUTO Mode : ");
     Serial.println(AUTO);
   }
-  
+
 }
 
-BLYNK_CONNECTED() 
+BLYNK_CONNECTED()
 {
+  Serial.println("Blynk Connected");
   Blynk.syncAll();
   // Blynk.syncVirtual(V1);
   // Blynk.syncVirtual(V2);
