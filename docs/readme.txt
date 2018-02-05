@@ -12,6 +12,7 @@ NETPIE client library for ESP8266 : https://github.com/netpieio/microgear-esp826
 Wemos D1 mini Pro : https://wiki.wemos.cc/products:d1:d1_mini_pro 
 
 เครื่องวัดอุณหภูมิและความชื้น
+
 ความสามารถเบื้องต้น
 
 บันทึกได้ละเอียด 1 วินาที ถึง 24 ชั่วโมง
