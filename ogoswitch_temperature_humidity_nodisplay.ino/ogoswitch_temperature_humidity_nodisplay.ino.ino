@@ -144,6 +144,11 @@ int afterStop = -1;
 bool send2thingspeak = false;
 
 const int MAXRETRY=4; // 0 - 4
+#define BLYNK_GREEN     "#23C48E"
+#define BLYNK_BLUE      "#04C0F8"
+#define BLYNK_YELLOW    "#ED9D00"
+#define BLYNK_RED       "#D3435C"
+#define BLYNK_DARK_BLUE "#5F7CD8"
 
 void setup() {
 
@@ -850,6 +855,12 @@ BLYNK_WRITE(V20)
   COOL = pinValue;
   Serial.print("Set cool: ");
   Serial.println(COOL);
+  if (COOL == 1) {
+    Blynk.setProperty(V20, "color", BLYNK_BLUE);
+  }
+  else if (COOL == 0) {
+    Blynk.setProperty(V20, "color", BLYNK_RED);
+  }
 }
 
 BLYNK_WRITE(V21)
