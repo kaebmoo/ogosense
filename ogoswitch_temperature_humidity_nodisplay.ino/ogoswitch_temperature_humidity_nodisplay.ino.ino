@@ -136,7 +136,7 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 bool shouldSaveConfig = false;
 
 BlynkTimer blynktimer, statustimer;
-Timer t_relay, t_delayStart, timer_delaysend;         // timer for ON period and delay start
+Timer t_relay, t_delayStart, timer_delaysend, timer_readsensor;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
@@ -335,14 +335,15 @@ void setup() {
     Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
     // Setup a function to be called every second
     blynktimer.setInterval(15000L, sendSensor);
-    statustimer.setInterval(1000L, sendStatus);
+    // statustimer.setInterval(5000L, sendStatus);
 
     digitalWrite(LED, HIGH);
     delay(500);
     digitalWrite(LED, LOW);
     buzzer_sound();
-    
-    
+
+    timer_readsensor.every(5000, temp_humi_sensor);
+
     // Blynk.setProperty(V1, "color", "#D3435C");
 }
 
@@ -350,9 +351,9 @@ void loop() {
 
   blink();
 
-  if(AUTO) {
-    temp_humi_sensor();
-  }
+  // read data from sensor and action by condition in options, COOL, MOISTURE
+  // temp_humi_sensor() every 1 sec.
+  
   sendThingSpeak();
   /*
    * netpie connect
@@ -368,199 +369,203 @@ void loop() {
   }
   */
 
-
-
   t_relay.update();
   t_delayStart.update();
   timer_delaysend.update();
+  timer_readsensor.update();
 
   Blynk.run();
   blynktimer.run();
   statustimer.run();
 
+  
 }
 
 void temp_humi_sensor()
 {
-
-  /*
-  options = analogRead(analogReadPin);
-  Serial.print("Analog Read : ");
-  Serial.print(options);
-
-  if (options < 100)
-    options = 0;  // humidity
-   else if (options > 100 && options < 200)
-    options = 1;  // temperature
-   else
-    options = 2;  // temperature && humidity
-  */
-
-  Serial.print("\tOptions : ");
-  Serial.println(options);
-
-  if(sht30.get()==0){
-    Serial.print("Temperature in Celsius : ");
-    Serial.print(sht30.cTemp);
-    Serial.print("\tset point : ");
-    Serial.print(temperature_setpoint);
-    Serial.print("\trange : ");
-    Serial.println(temperature_range);
-    Serial.print("Temperature in Fahrenheit : ");
-    Serial.println(sht30.fTemp);
-    Serial.print("Relative Humidity : ");
-    Serial.print(sht30.humidity);
-    Serial.print("\tset point : ");
-    Serial.print(humidity_setpoint);
-    Serial.print("\trange : ");
-    Serial.println(humidity_range);
-
-
-    if (MOISTURE) {
-      if (sht30.humidity < humidity_setpoint) {
-
-        humion = true;
+  int humidity_sensor_value;
+  if(AUTO) {
+    
+    
+    /*
+    options = analogRead(analogReadPin);
+    Serial.print("Analog Read : ");
+    Serial.print(options);
+  
+    if (options < 100)
+      options = 0;  // humidity
+     else if (options > 100 && options < 200)
+      options = 1;  // temperature
+     else
+      options = 2;  // temperature && humidity
+    */
+  
+    Serial.print("\tOptions : ");
+    Serial.println(options);
+  
+    if(sht30.get()==0){
+      Serial.print("Temperature in Celsius : ");
+      Serial.print(sht30.cTemp);
+      Serial.print("\tset point : ");
+      Serial.print(temperature_setpoint);
+      Serial.print("\trange : ");
+      Serial.println(temperature_range);
+      Serial.print("Temperature in Fahrenheit : ");
+      Serial.println(sht30.fTemp);
+      Serial.print("Relative Humidity : ");
+      Serial.print(sht30.humidity);
+      Serial.print("\tset point : ");
+      Serial.print(humidity_setpoint);
+      Serial.print("\trange : ");
+      Serial.println(humidity_range);
+  
+      humidity_sensor_value = (int) sht30.humidity;
+  
+      if (MOISTURE == 1) {
+        if (humidity_sensor_value < humidity_setpoint) {
+  
+          humion = true;
+        }
+        else if (humidity_sensor_value > (humidity_setpoint + humidity_range)) {
+          humion = false;
+        }
       }
-      else if (sht30.humidity > (humidity_setpoint + humidity_range)) {
-        humion = false;
+      else if (MOISTURE == 0){
+        if (humidity_sensor_value > humidity_setpoint) {
+          humion = true;
+        }
+        else if (humidity_sensor_value < (humidity_setpoint - humidity_range)) {
+  
+          humion = false;
+        }
       }
+  
+      if(COOL == 1) {
+        if (sht30.cTemp > temperature_setpoint) {
+  
+          tempon = true;
+        }
+        else if (sht30.cTemp < (temperature_setpoint - temperature_range)) {
+  
+          tempon = false;
+        }
+      }
+      else if (COOL == 0){
+        if (sht30.cTemp < temperature_setpoint) {
+  
+          tempon = true;
+        }
+        else if (sht30.cTemp > (temperature_setpoint + temperature_range)) {
+  
+          tempon = false;
+        }
+      }
+  
+      if (options == 2) {
+        Serial.println("Option: Temperature & Humidity");
+        if (tempon == true && humion == true) {
+          if (RelayEvent == false) {
+            afterStart = t_relay.after(onPeriod, turnoff);
+            Serial.println("On Timer Start.");
+            RelayEvent = true;
+            turnrelay_onoff(HIGH);
+  
+          }
+        }
+        else if (tempon == false && humion == false) {
+          if (afterStart != -1) {
+            t_relay.stop(afterStart);
+            afterStart = -1;
+          }
+          Serial.println("OFF");
+          if (digitalRead(RELAY1) == HIGH) {
+            turnrelay_onoff(LOW);
+          }
+  
+          // delay start
+          if (RelayEvent == true && afterStop == -1) {
+              afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
+              Serial.println("Timer Delay Start");
+          }
+        }
+      }
+      else if (options == 1) {
+        Serial.println("Option: Temperature");
+        if (tempon == true) {
+          if (RelayEvent == false) {
+            afterStart = t_relay.after(onPeriod, turnoff);
+            Serial.println("On Timer Start.");
+            RelayEvent = true;
+            turnrelay_onoff(HIGH);
+  
+          }
+        }
+        else if (tempon == false) {
+          if (afterStart != -1) {
+            t_relay.stop(afterStart);
+            afterStart = -1;
+          }
+          Serial.println("OFF");
+          if (digitalRead(RELAY1) == HIGH) {
+            turnrelay_onoff(LOW);
+          }
+  
+          // delay start
+          if (RelayEvent == true && afterStop == -1) {
+              afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
+              Serial.println("Timer Delay Start");
+          }
+  
+        }
+      }
+      else {
+        Serial.println("Option: Humidity");
+        if (humion == true) {
+          if (RelayEvent == false) {
+            afterStart = t_relay.after(onPeriod, turnoff);
+            Serial.println("On Timer Start.");
+            RelayEvent = true;
+            turnrelay_onoff(HIGH);
+  
+          }
+        }
+        else if (humion == false) {
+          if (afterStart != -1) {
+            t_relay.stop(afterStart);
+            afterStart = -1;
+          }
+          Serial.println("OFF");
+          if (digitalRead(RELAY1) == HIGH) {
+            turnrelay_onoff(LOW);
+          }
+  
+          // delay start
+          if (RelayEvent == true && afterStop == -1) {
+              afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
+              Serial.println("Timer Delay Start");
+          }
+        }
+      }
+  
+      Serial.print("tempon = ");
+      Serial.print(tempon);
+      Serial.print(" humion = ");
+      Serial.print(humion);
+      Serial.print(" RelayEvent = ");
+      Serial.print(RelayEvent);
+      Serial.print(" afterStart = ");
+      Serial.print(afterStart);
+      Serial.print(" afterStop = ");
+      Serial.println(afterStop);  
+      Serial.println();
+  
+  
+  
     }
-    else {
-      if (sht30.humidity > humidity_setpoint) {
-        humion = true;
-      }
-      else if (sht30.humidity < (humidity_setpoint - humidity_range)) {
-
-        humion = false;
-      }
+    else
+    {
+      Serial.println("Sensor Error!");
     }
-
-    if(COOL) {
-      if (sht30.cTemp > temperature_setpoint) {
-
-        tempon = true;
-      }
-      else if (sht30.cTemp < (temperature_setpoint - temperature_range)) {
-
-        tempon = false;
-      }
-    }
-    else {
-      if (sht30.cTemp < temperature_setpoint) {
-
-        tempon = true;
-      }
-      else if (sht30.cTemp > (temperature_setpoint + temperature_range)) {
-
-        tempon = false;
-      }
-    }
-
-    if (options == 2) {
-      Serial.println("Option: Temperature & Humidity");
-      if (tempon == true && humion == true) {
-        if (RelayEvent == false) {
-          afterStart = t_relay.after(onPeriod, turnoff);
-          Serial.println("On Timer Start.");
-          RelayEvent = true;
-          turnrelay_onoff(HIGH);
-
-        }
-      }
-      else if (tempon == false && humion == false) {
-        if (afterStart != -1) {
-          t_relay.stop(afterStart);
-          afterStart = -1;
-        }
-        Serial.println("OFF");
-        if (digitalRead(RELAY1) == HIGH) {
-          turnrelay_onoff(LOW);  
-        }
-
-        // delay start
-        if (RelayEvent == true && afterStop == -1) {
-            afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
-            Serial.println("Timer Delay Start");
-        }
-      }
-    }
-    else if (options == 1) {
-      Serial.println("Option: Temperature");
-      if (tempon == true) {
-        if (RelayEvent == false) {
-          afterStart = t_relay.after(onPeriod, turnoff);
-          Serial.println("On Timer Start.");
-          RelayEvent = true;
-          turnrelay_onoff(HIGH);
-
-        }
-      }
-      else if (tempon == false) {
-        if (afterStart != -1) {
-          t_relay.stop(afterStart);
-          afterStart = -1;
-        }
-        Serial.println("OFF");
-        if (digitalRead(RELAY1) == HIGH) {
-          turnrelay_onoff(LOW);  
-        }
-
-        // delay start
-        if (RelayEvent == true && afterStop == -1) {
-            afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
-            Serial.println("Timer Delay Start");
-        }
-
-      }
-    }
-    else {
-      Serial.println("Option: Humidity");
-      if (humion == true) {
-        if (RelayEvent == false) {
-          afterStart = t_relay.after(onPeriod, turnoff);
-          Serial.println("On Timer Start.");
-          RelayEvent = true;
-          turnrelay_onoff(HIGH);
-
-        }
-      }
-      else if (humion == false) {
-        if (afterStart != -1) {
-          t_relay.stop(afterStart);
-          afterStart = -1;
-        }
-        Serial.println("OFF");
-        if (digitalRead(RELAY1) == HIGH) {
-          turnrelay_onoff(LOW);  
-        }
-
-        // delay start
-        if (RelayEvent == true && afterStop == -1) {
-            afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
-            Serial.println("Timer Delay Start");
-        }
-      }
-    }
-
-    Serial.print("tempon = ");
-    Serial.print(tempon);
-    Serial.print(" humion = ");
-    Serial.print(humion);
-    Serial.print(" RelayEvent = ");
-    Serial.print(RelayEvent);
-    Serial.print(" afterStart = ");
-    Serial.print(afterStart);
-    Serial.print(" afterStop = ");
-    Serial.println(afterStop);
-
-    // Serial.println();
-
-
-
-  }
-  else
-  {
-    Serial.println("Sensor Error!");
   }
 }
 
@@ -837,6 +842,82 @@ BLYNK_WRITE(V2)
   }
 
 }
+
+BLYNK_WRITE(V20)
+{
+  int pinValue = param.asInt(); // assigning incoming value from pin V20 to a variable
+
+  COOL = pinValue;
+  Serial.print("Set cool: ");
+  Serial.println(COOL);
+}
+
+BLYNK_WRITE(V21)
+{
+  int pinValue = param.asInt(); // assigning incoming value from pin V21 to a variable
+
+  MOISTURE = pinValue;
+  Serial.print("Set moisture: ");
+  Serial.println(MOISTURE);
+}
+
+BLYNK_WRITE(V22)
+{
+  int pinValue = param.asInt(); // assigning incoming value from pin V22 to a variable
+
+  options = pinValue;
+  Serial.print("Set option: ");
+  Serial.println(options);
+}
+
+BLYNK_WRITE(V23)
+{
+  int pinValue = param.asInt(); // assigning incoming value from pin V23 to a variable
+
+  if (pinValue == 1) {      
+    delay(500);
+    ESP.reset();
+    delay(5000);  
+  }
+}
+
+BLYNK_WRITE(V24)
+{
+  int stepperValue = param.asInt();
+
+  Serial.print("Temperature setpoint: ");
+  Serial.println(stepperValue);
+  temperature_setpoint = stepperValue;
+  
+}
+
+BLYNK_WRITE(V25)
+{
+  int stepperValue = param.asInt();
+  
+  Serial.print("Temperature range: ");
+  Serial.println(stepperValue);
+  temperature_range = stepperValue;
+}
+
+BLYNK_WRITE(V26)
+{
+  int stepperValue = param.asInt();
+
+  Serial.print("Humidity setpoint: ");
+  Serial.println(stepperValue);
+  humidity_setpoint = stepperValue;
+}
+
+BLYNK_WRITE(V27)
+{
+  int stepperValue = param.asInt();
+
+  Serial.print("Humidity setpoint: ");
+  Serial.println(stepperValue);
+  humidity_range = stepperValue;
+}
+
 
 BLYNK_CONNECTED()
 {
