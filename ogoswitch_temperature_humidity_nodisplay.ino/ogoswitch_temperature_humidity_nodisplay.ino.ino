@@ -191,8 +191,8 @@ void setup() {
   readEEPROM(writeAPIKey, 28, 16);
   readEEPROM(readAPIKey, 44, 16);
   readEEPROM(auth, 60, 32);
-  channelID = (unsigned long) EEPROMReadlong(92); 
-  
+  channelID = (unsigned long) EEPROMReadlong(92);
+
 
 
   Serial.println();
@@ -249,13 +249,13 @@ void setup() {
   }
 
 
-  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint", t_setpoint, 6);
-  WiFiManagerParameter custom_t_range("t_range", "temperature range", t_range, 6);
-  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint", h_setpoint, 6);
-  WiFiManagerParameter custom_h_range("h_range", "humidity range", h_range, 6);
-  WiFiManagerParameter custom_c_options("c_options", "OPTION", c_options, 6);
-  WiFiManagerParameter custom_c_cool("c_cool", "COOL", c_cool, 6);
-  WiFiManagerParameter custom_c_moisture("c_moisture", "MOISTURE", c_moisture, 6);
+  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
+  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
+  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
+  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
+  WiFiManagerParameter custom_c_options("c_options", "OPTION : 0,1,2", c_options, 6);
+  WiFiManagerParameter custom_c_cool("c_cool", "COOL : 0,1", c_cool, 6);
+  WiFiManagerParameter custom_c_moisture("c_moisture", "MOISTURE : 0,1", c_moisture, 6);
   WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key", c_writeapikey, 17);
   WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key", c_readapikey, 17);
   WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
@@ -365,7 +365,7 @@ void setup() {
       Serial.println(auth);
       Serial.print("Channel ID : ");
       Serial.println(channelID);
-      
+
       eeWriteInt(0, atoi(h_setpoint));
       eeWriteInt(4, atoi(h_range));
       eeWriteInt(8, atoi(t_setpoint));
@@ -375,9 +375,9 @@ void setup() {
       eeWriteInt(24, MOISTURE);
       writeEEPROM(writeAPIKey, 28, 16);
       writeEEPROM(readAPIKey, 44, 16);
-      writeEEPROM(auth, 60, 32);      
+      writeEEPROM(auth, 60, 32);
       EEPROMWritelong(92, (long) channelID);
-      
+
     }
 
     ThingSpeak.begin( client );
@@ -733,7 +733,7 @@ void EEPROMWritelong(int address, long value)
   Serial.print(" ");
   Serial.print(one);
   Serial.println();
-  
+
   //Write the 4 bytes into the eeprom memory.
   EEPROM.write(address, four);
   EEPROM.write(address + 1, three);
@@ -758,7 +758,7 @@ long EEPROMReadlong(int address)
   Serial.print(" ");
   Serial.print(one);
   Serial.println();
-  
+
   //Return the recomposed long by using bitshift.
   return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
 }
