@@ -110,6 +110,10 @@ char h_range[6] = "20";
 char c_options[6] = "1";
 char c_cool[6] = "1";
 char c_moisture[6] = "0";
+char c_writeapikey[17] = "";    // write api key thingspeak
+char c_readapikey[17] = "";     // read api key thingspeak
+char c_auth[33] = "";           // authen token blynk
+char c_channelid[8] = "";       // channel id thingspeak
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 
@@ -153,22 +157,25 @@ const int MAXRETRY=4; // 0 - 4
 void setup() {
 
   Serial.begin(115200);
+  Serial.println();
+  Serial.println("starting");
+
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(LED, OUTPUT);
   pinMode(analogReadPin, INPUT);
   pinMode(RELAY1, OUTPUT);
   digitalWrite(RELAY1, LOW);
+
   display.setBrightness(0x0a); //set the diplay to maximum brightness
-  Serial.println("starting");
-  options = analogRead(analogReadPin);
-  Serial.println(options);
+  // options = analogRead(analogReadPin);
+  // Serial.println(options);
 
   // put your setup code here, to run once:
 
   /* setup netpie call back */
   microgear.on(MESSAGE,onMsghandler);
   microgear.on(CONNECTED,onConnected);
-  microgear.setEEPROMOffset(48);
+  microgear.setEEPROMOffset(116);
 
 
 
@@ -181,6 +188,12 @@ void setup() {
   options = eeGetInt(16);
   COOL = eeGetInt(20);
   MOISTURE = eeGetInt(24);
+  readEEPROM(writeAPIKey, 28, 16);
+  readEEPROM(readAPIKey, 44, 16);
+  readEEPROM(auth, 60, 32);
+  channelID = (unsigned long) EEPROMReadlong(92); 
+  
+
 
   Serial.println();
   Serial.print("Temperature : ");
@@ -197,6 +210,14 @@ void setup() {
   Serial.println(COOL);
   Serial.print("MOISTURE : ");
   Serial.println(MOISTURE);
+  Serial.print("Write API Key : ");
+  Serial.println(writeAPIKey);
+  Serial.print("Read API Key : ");
+  Serial.println(readAPIKey);
+  Serial.print("auth token : ");
+  Serial.println(auth);
+  Serial.print("Channel ID : ");
+  Serial.println(channelID);
 
   if (temperature_setpoint > 100 || temperature_setpoint < 0) {
     temperature_setpoint = 30;
@@ -235,6 +256,10 @@ void setup() {
   WiFiManagerParameter custom_c_options("c_options", "OPTION", c_options, 6);
   WiFiManagerParameter custom_c_cool("c_cool", "COOL", c_cool, 6);
   WiFiManagerParameter custom_c_moisture("c_moisture", "MOISTURE", c_moisture, 6);
+  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key", c_writeapikey, 17);
+  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key", c_readapikey, 17);
+  WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
+  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
 
 
     //WiFiManager
@@ -252,6 +277,10 @@ void setup() {
     wifiManager.addParameter(&custom_c_options);
     wifiManager.addParameter(&custom_c_cool);
     wifiManager.addParameter(&custom_c_moisture);
+    wifiManager.addParameter(&custom_c_writeapikey);
+    wifiManager.addParameter(&custom_c_readapikey);
+    wifiManager.addParameter(&custom_c_auth);
+    wifiManager.addParameter(&custom_c_channelid);
 
 
     //reset saved settings
@@ -297,6 +326,22 @@ void setup() {
       strcpy(c_options, custom_c_options.getValue());
       strcpy(c_cool, custom_c_cool.getValue());
       strcpy(c_moisture, custom_c_moisture.getValue());
+      strcpy(c_writeapikey, custom_c_writeapikey.getValue());
+      strcpy(c_readapikey, custom_c_readapikey.getValue());
+      strcpy(c_auth, custom_c_auth.getValue());
+      strcpy(c_channelid, custom_c_channelid.getValue());
+
+      temperature_setpoint = atol(t_setpoint);
+      temperature_range = atol(t_range);
+      humidity_setpoint = atol(h_setpoint);
+      humidity_range = atol(h_range);
+      options = atoi(c_options);
+      COOL = atoi(c_cool);
+      MOISTURE = atoi(c_moisture);
+      strcpy(writeAPIKey, c_writeapikey);
+      strcpy(readAPIKey, c_readapikey);
+      strcpy(auth, c_auth);
+      channelID = (unsigned long) atol(c_channelid);
 
       Serial.print("Temperature : ");
       Serial.println(t_setpoint);
@@ -312,15 +357,15 @@ void setup() {
       Serial.println(COOL);
       Serial.print("MOISTURE : ");
       Serial.println(MOISTURE);
-
-      temperature_setpoint = atol(t_setpoint);
-      temperature_range = atol(t_range);
-      humidity_setpoint = atol(h_setpoint);
-      humidity_range = atol(h_range);
-      options = atoi(c_options);
-      COOL = atoi(c_cool);
-      MOISTURE = atoi(c_moisture);
-
+      Serial.print("Write API Key : ");
+      Serial.println(writeAPIKey);
+      Serial.print("Read API Key : ");
+      Serial.println(readAPIKey);
+      Serial.print("auth token : ");
+      Serial.println(auth);
+      Serial.print("Channel ID : ");
+      Serial.println(channelID);
+      
       eeWriteInt(0, atoi(h_setpoint));
       eeWriteInt(4, atoi(h_range));
       eeWriteInt(8, atoi(t_setpoint));
@@ -328,6 +373,11 @@ void setup() {
       eeWriteInt(16, options);
       eeWriteInt(20, COOL);
       eeWriteInt(24, MOISTURE);
+      writeEEPROM(writeAPIKey, 28, 16);
+      writeEEPROM(readAPIKey, 44, 16);
+      writeEEPROM(auth, 60, 32);      
+      EEPROMWritelong(92, (long) channelID);
+      
     }
 
     ThingSpeak.begin( client );
@@ -358,7 +408,7 @@ void loop() {
 
   // read data from sensor and action by condition in options, COOL, MOISTURE
   // temp_humi_sensor() every 1 sec.
-  
+
   sendThingSpeak();
   /*
    * netpie connect
@@ -383,20 +433,20 @@ void loop() {
   blynktimer.run();
   statustimer.run();
 
-  
+
 }
 
 void temp_humi_sensor()
 {
   int humidity_sensor_value;
   if(AUTO) {
-    
-    
+
+
     /*
     options = analogRead(analogReadPin);
     Serial.print("Analog Read : ");
     Serial.print(options);
-  
+
     if (options < 100)
       options = 0;  // humidity
      else if (options > 100 && options < 200)
@@ -404,10 +454,10 @@ void temp_humi_sensor()
      else
       options = 2;  // temperature && humidity
     */
-  
+
     Serial.print("\tOptions : ");
     Serial.println(options);
-  
+
     if(sht30.get()==0){
       Serial.print("Temperature in Celsius : ");
       Serial.print(sht30.cTemp);
@@ -423,12 +473,12 @@ void temp_humi_sensor()
       Serial.print(humidity_setpoint);
       Serial.print("\trange : ");
       Serial.println(humidity_range);
-  
+
       humidity_sensor_value = (int) sht30.humidity;
-  
+
       if (MOISTURE == 1) {
         if (humidity_sensor_value < humidity_setpoint) {
-  
+
           humion = true;
         }
         else if (humidity_sensor_value > (humidity_setpoint + humidity_range)) {
@@ -440,32 +490,32 @@ void temp_humi_sensor()
           humion = true;
         }
         else if (humidity_sensor_value < (humidity_setpoint - humidity_range)) {
-  
+
           humion = false;
         }
       }
-  
+
       if(COOL == 1) {
         if (sht30.cTemp > temperature_setpoint) {
-  
+
           tempon = true;
         }
         else if (sht30.cTemp < (temperature_setpoint - temperature_range)) {
-  
+
           tempon = false;
         }
       }
       else if (COOL == 0){
         if (sht30.cTemp < temperature_setpoint) {
-  
+
           tempon = true;
         }
         else if (sht30.cTemp > (temperature_setpoint + temperature_range)) {
-  
+
           tempon = false;
         }
       }
-  
+
       if (options == 2) {
         Serial.println("Option: Temperature & Humidity");
         if (tempon == true && humion == true) {
@@ -474,7 +524,7 @@ void temp_humi_sensor()
             Serial.println("On Timer Start.");
             RelayEvent = true;
             turnrelay_onoff(HIGH);
-  
+
           }
         }
         else if (tempon == false && humion == false) {
@@ -486,7 +536,7 @@ void temp_humi_sensor()
           if (digitalRead(RELAY1) == HIGH) {
             turnrelay_onoff(LOW);
           }
-  
+
           // delay start
           if (RelayEvent == true && afterStop == -1) {
               afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
@@ -502,7 +552,7 @@ void temp_humi_sensor()
             Serial.println("On Timer Start.");
             RelayEvent = true;
             turnrelay_onoff(HIGH);
-  
+
           }
         }
         else if (tempon == false) {
@@ -514,13 +564,13 @@ void temp_humi_sensor()
           if (digitalRead(RELAY1) == HIGH) {
             turnrelay_onoff(LOW);
           }
-  
+
           // delay start
           if (RelayEvent == true && afterStop == -1) {
               afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
               Serial.println("Timer Delay Start");
           }
-  
+
         }
       }
       else {
@@ -531,7 +581,7 @@ void temp_humi_sensor()
             Serial.println("On Timer Start.");
             RelayEvent = true;
             turnrelay_onoff(HIGH);
-  
+
           }
         }
         else if (humion == false) {
@@ -543,7 +593,7 @@ void temp_humi_sensor()
           if (digitalRead(RELAY1) == HIGH) {
             turnrelay_onoff(LOW);
           }
-  
+
           // delay start
           if (RelayEvent == true && afterStop == -1) {
               afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
@@ -551,7 +601,7 @@ void temp_humi_sensor()
           }
         }
       }
-  
+
       Serial.print("tempon = ");
       Serial.print(tempon);
       Serial.print(" humion = ");
@@ -561,11 +611,11 @@ void temp_humi_sensor()
       Serial.print(" afterStart = ");
       Serial.print(afterStart);
       Serial.print(" afterStop = ");
-      Serial.println(afterStop);  
+      Serial.println(afterStop);
       Serial.println();
-  
-  
-  
+
+
+
     }
     else
     {
@@ -664,6 +714,69 @@ int eeGetInt(int pos) {
   *(p + 2)  = EEPROM.read(pos + 2);
   *(p + 3)  = EEPROM.read(pos + 3);
   return val;
+}
+
+void EEPROMWritelong(int address, long value)
+{
+  //Decomposition from a long to 4 bytes by using bitshift.
+  //One = Most significant -> Four = Least significant byte
+  byte four = (value & 0xFF);
+  byte three = ((value >> 8) & 0xFF);
+  byte two = ((value >> 16) & 0xFF);
+  byte one = ((value >> 24) & 0xFF);
+
+  Serial.print(four);
+  Serial.print(" ");
+  Serial.print(three);
+  Serial.print(" ");
+  Serial.print(two);
+  Serial.print(" ");
+  Serial.print(one);
+  Serial.println();
+  
+  //Write the 4 bytes into the eeprom memory.
+  EEPROM.write(address, four);
+  EEPROM.write(address + 1, three);
+  EEPROM.write(address + 2, two);
+  EEPROM.write(address + 3, one);
+  EEPROM.commit();
+}
+
+long EEPROMReadlong(int address)
+{
+  //Read the 4 bytes from the eeprom memory.
+  long four = EEPROM.read(address);
+  long three = EEPROM.read(address + 1);
+  long two = EEPROM.read(address + 2);
+  long one = EEPROM.read(address + 3);
+
+  Serial.print(four);
+  Serial.print(" ");
+  Serial.print(three);
+  Serial.print(" ");
+  Serial.print(two);
+  Serial.print(" ");
+  Serial.print(one);
+  Serial.println();
+  
+  //Return the recomposed long by using bitshift.
+  return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
+}
+
+void readEEPROM(char* buff, int offset, int len) {
+    int i;
+    for (i=0;i<len;i++) {
+        buff[i] = (char)EEPROM.read(offset+i);
+    }
+    buff[len] = '\0';
+}
+
+void writeEEPROM(char* buff, int offset, int len) {
+    int i;
+    for (i=0;i<len;i++) {
+        EEPROM.write(offset+i,buff[i]);
+    }
+    EEPROM.commit();
 }
 
 int init_sdcard()
@@ -885,10 +998,10 @@ BLYNK_WRITE(V23)
 {
   int pinValue = param.asInt(); // assigning incoming value from pin V23 to a variable
 
-  if (pinValue == 1) {      
+  if (pinValue == 1) {
     delay(500);
     ESP.reset();
-    delay(5000);  
+    delay(5000);
   }
 }
 
@@ -899,13 +1012,13 @@ BLYNK_WRITE(V24)
   Serial.print("Temperature setpoint: ");
   Serial.println(stepperValue);
   temperature_setpoint = stepperValue;
-  
+
 }
 
 BLYNK_WRITE(V25)
 {
   int stepperValue = param.asInt();
-  
+
   Serial.print("Temperature range: ");
   Serial.println(stepperValue);
   temperature_range = stepperValue;
