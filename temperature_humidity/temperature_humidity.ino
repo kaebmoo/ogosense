@@ -96,6 +96,9 @@ char h_range[6] = "20";
 char c_options[6] = "1";
 char c_cool[6] = "1";
 char c_moisture[6] = "0";
+char c_writeapikey[17] = "";    // write api key thingspeak
+char c_readapikey[17] = "";     // read api key thingspeak
+char c_channelid[8] = "";       // channel id thingspeak
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 
@@ -159,6 +162,9 @@ void setup() {
   options = eeGetInt(16);
   COOL = eeGetInt(20);
   MOISTURE = eeGetInt(24);
+  readEEPROM(writeAPIKey, 28, 16);
+  readEEPROM(readAPIKey, 44, 16); 
+  channelID = (unsigned long) EEPROMReadlong(92);
 
   Serial.println();
   Serial.print("Temperature : ");
@@ -175,6 +181,12 @@ void setup() {
   Serial.println(COOL);
   Serial.print("MOISTURE : ");
   Serial.println(MOISTURE);
+  Serial.print("Write API Key : ");
+  Serial.println(writeAPIKey);
+  Serial.print("Read API Key : ");
+  Serial.println(readAPIKey);
+  Serial.print("Channel ID : ");
+  Serial.println(channelID);
 
   if (temperature_setpoint > 100 || temperature_setpoint < 0) {
     temperature_setpoint = 30;
@@ -213,6 +225,9 @@ void setup() {
   WiFiManagerParameter custom_c_options("c_options", "OPTION", c_options, 6);
   WiFiManagerParameter custom_c_cool("c_cool", "COOL", c_cool, 6);
   WiFiManagerParameter custom_c_moisture("c_moisture", "MOISTURE", c_moisture, 6);
+  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key", c_writeapikey, 17);
+  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key", c_readapikey, 17);
+  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
 
 
     //WiFiManager
@@ -230,6 +245,9 @@ void setup() {
     wifiManager.addParameter(&custom_c_options);
     wifiManager.addParameter(&custom_c_cool);
     wifiManager.addParameter(&custom_c_moisture);
+    wifiManager.addParameter(&custom_c_writeapikey);
+    wifiManager.addParameter(&custom_c_readapikey);
+    wifiManager.addParameter(&custom_c_channelid);
 
 
     //reset saved settings
@@ -275,6 +293,22 @@ void setup() {
       strcpy(c_options, custom_c_options.getValue());
       strcpy(c_cool, custom_c_cool.getValue());
       strcpy(c_moisture, custom_c_moisture.getValue());
+      strcpy(c_writeapikey, custom_c_writeapikey.getValue());
+      strcpy(c_readapikey, custom_c_readapikey.getValue());
+      strcpy(c_channelid, custom_c_channelid.getValue());
+
+      
+
+      temperature_setpoint = atol(t_setpoint);
+      temperature_range = atol(t_range);
+      humidity_setpoint = atol(h_setpoint);
+      humidity_range = atol(h_range);
+      options = atoi(c_options);
+      COOL = atoi(c_cool);
+      MOISTURE = atoi(c_moisture);
+      strcpy(writeAPIKey, c_writeapikey);
+      strcpy(readAPIKey, c_readapikey);
+      channelID = (unsigned long) atol(c_channelid);
 
       Serial.print("Temperature : ");
       Serial.println(t_setpoint);
@@ -290,14 +324,12 @@ void setup() {
       Serial.println(COOL);
       Serial.print("MOISTURE : ");
       Serial.println(MOISTURE);
-
-      temperature_setpoint = atol(t_setpoint);
-      temperature_range = atol(t_range);
-      humidity_setpoint = atol(h_setpoint);
-      humidity_range = atol(h_range);
-      options = atoi(c_options);
-      COOL = atoi(c_cool);
-      MOISTURE = atoi(c_moisture);
+      Serial.print("Write API Key : ");
+      Serial.println(writeAPIKey);
+      Serial.print("Read API Key : ");
+      Serial.println(readAPIKey);
+      Serial.print("Channel ID : ");
+      Serial.println(channelID);
 
       eeWriteInt(0, atoi(h_setpoint));
       eeWriteInt(4, atoi(h_range));
@@ -306,6 +338,9 @@ void setup() {
       eeWriteInt(16, options);
       eeWriteInt(20, COOL);
       eeWriteInt(24, MOISTURE);
+      writeEEPROM(writeAPIKey, 28, 16);
+      writeEEPROM(readAPIKey, 44, 16);      
+      EEPROMWritelong(92, (long) channelID);
     }
 
     ThingSpeak.begin( client );
@@ -623,6 +658,70 @@ int eeGetInt(int pos) {
   *(p + 3)  = EEPROM.read(pos + 3);
   return val;
 }
+
+void EEPROMWritelong(int address, long value)
+{
+  //Decomposition from a long to 4 bytes by using bitshift.
+  //One = Most significant -> Four = Least significant byte
+  byte four = (value & 0xFF);
+  byte three = ((value >> 8) & 0xFF);
+  byte two = ((value >> 16) & 0xFF);
+  byte one = ((value >> 24) & 0xFF);
+
+  Serial.print(four);
+  Serial.print(" ");
+  Serial.print(three);
+  Serial.print(" ");
+  Serial.print(two);
+  Serial.print(" ");
+  Serial.print(one);
+  Serial.println();
+
+  //Write the 4 bytes into the eeprom memory.
+  EEPROM.write(address, four);
+  EEPROM.write(address + 1, three);
+  EEPROM.write(address + 2, two);
+  EEPROM.write(address + 3, one);
+  EEPROM.commit();
+}
+
+long EEPROMReadlong(int address)
+{
+  //Read the 4 bytes from the eeprom memory.
+  long four = EEPROM.read(address);
+  long three = EEPROM.read(address + 1);
+  long two = EEPROM.read(address + 2);
+  long one = EEPROM.read(address + 3);
+
+  Serial.print(four);
+  Serial.print(" ");
+  Serial.print(three);
+  Serial.print(" ");
+  Serial.print(two);
+  Serial.print(" ");
+  Serial.print(one);
+  Serial.println();
+
+  //Return the recomposed long by using bitshift.
+  return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
+}
+
+void readEEPROM(char* buff, int offset, int len) {
+    int i;
+    for (i=0;i<len;i++) {
+        buff[i] = (char)EEPROM.read(offset+i);
+    }
+    buff[len] = '\0';
+}
+
+void writeEEPROM(char* buff, int offset, int len) {
+    int i;
+    for (i=0;i<len;i++) {
+        EEPROM.write(offset+i,buff[i]);
+    }
+    EEPROM.commit();
+}
+
 
 int init_sdcard()
 {
