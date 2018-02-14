@@ -47,15 +47,16 @@ SOFTWARE.
 #define KEY     "sYZknE19LHxr1zJ"           // key from netpie
 #define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
 
-String ALIAS = "OgoSense0000";              // alias name netpie
-char *me = "/nid/0000004";                  // topic set for sensor box
-char *mystatus = "/nid/0000004/status";     // topic status "1" or "0", "ON" or "OFF"
+String ALIAS = "OgoSense0001";              // alias name netpie
+char *me = "/nid/0000001";                  // topic set for sensor box
+char *mystatus = "/nid/0000001/status";     // topic status "1" or "0", "ON" or "OFF"
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 415032;
-char *readAPIKey = "LS3O2U5LR8F6YP7O";
-char *writeAPIKey = "8GD5Q9E18LRCGBCK";
+unsigned long channelID = 414252;
+char *writeAPIKey = "IVDCJXLE6GUKW41L";
+char *readAPIKey = "7SGL05KU9TXSUD2N";
+
 const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
 
 unsigned int dataFieldFour = 4;                            // Field to write temperature C data
@@ -83,10 +84,10 @@ float maxhumidity = 60.0;
 float minhumidity = 40.0;
 
 float temperature_setpoint = 30.0;  // 30.0 set point
-float temperature_range = 4.0;      // +- 4.0 from set point
+float temperature_range = 2.0;      // +- 4.0 from set point
 
 float humidity_setpoint = 60.0;     // 60 set point RH %
-float humidity_range = 20;          // +- 20 from set point
+float humidity_range = 5;          // +- 20 from set point
 
 // set for wifimanager to get value from user
 char t_setpoint[6] = "30";
@@ -124,7 +125,7 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 //flag for saving data
 bool shouldSaveConfig = false;
 
-Timer t_relay, t_delayStart, timer_delaysend;         // timer for ON period and delay start
+Timer t_relay, t_delayStart, timer_delaysend, timer_read_sensor;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
@@ -348,6 +349,8 @@ void setup() {
     // microgear.useTLS(true);
     // microgear.init(KEY,SECRET,(char *) ALIAS.c_str());
     // microgear.connect(APPID);
+
+    timer_read_sensor.every(1000, temp_humi_sensor);
 }
 
 void loop() {
@@ -366,14 +369,12 @@ void loop() {
   */
 
   blink();
-  temp_humi_sensor();
+  // temp_humi_sensor();
   
-  Serial.println();
-
   t_relay.update();
   t_delayStart.update();
   timer_delaysend.update();
-
+  timer_read_sensor.update();
 }
 
 void temp_humi_sensor()
@@ -580,6 +581,7 @@ void temp_humi_sensor()
   {
     Serial.println("Sensor Error!");
   }
+  Serial.println("");
 
 }
 
