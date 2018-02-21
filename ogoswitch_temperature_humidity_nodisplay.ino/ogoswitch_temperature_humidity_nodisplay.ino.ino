@@ -224,7 +224,7 @@ void setup() {
     shouldSaveConfig = true;
   }
   if (temperature_range > 100 || temperature_range < 0) {
-    temperature_range = 4;
+    temperature_range = 2;
     shouldSaveConfig = true;
   }
   if (humidity_setpoint > 100 || humidity_setpoint < 0) {
@@ -232,7 +232,7 @@ void setup() {
     shouldSaveConfig = true;
   }
   if (humidity_range > 100 || humidity_range < 0) {
-    humidity_range = 20;
+    humidity_range = 5;
     shouldSaveConfig = true;
   }
   if (options > 2 || options < 0) {
