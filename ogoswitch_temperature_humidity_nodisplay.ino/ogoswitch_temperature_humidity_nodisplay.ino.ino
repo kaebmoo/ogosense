@@ -104,9 +104,9 @@ float humidity_range = 20;          // +- 20 from set point
 
 // set for wifimanager to get value from user
 char t_setpoint[6] = "30";
-char t_range[6] = "4";
-char h_setpoint[6] = "70";
-char h_range[6] = "20";
+char t_range[6] = "2";
+char h_setpoint[6] = "60";
+char h_range[6] = "5";
 char c_options[6] = "1";
 char c_cool[6] = "1";
 char c_moisture[6] = "0";
@@ -117,6 +117,7 @@ char c_channelid[8] = "";       // channel id thingspeak
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 
+int SAVE = 6550;      // Configuration save : if 6550 = saved
 int COOL = 1;        // true > set point, false < set point = HEAT mode
 int MOISTURE = 0;   // true < set point; false > set point
 boolean tempon = false;     // flag ON/OFF
@@ -193,7 +194,20 @@ void setup() {
   readEEPROM(auth, 60, 32);
   channelID = (unsigned long) EEPROMReadlong(92);
 
-
+  int saved = eeGetInt(500);
+  if (saved == 6550) {  
+    dtostrf(humidity_setpoint, 2, 0, h_setpoint);
+    dtostrf(humidity_range, 2, 0, h_range);
+    dtostrf(temperature_setpoint, 2, 0, t_setpoint);
+    dtostrf(temperature_range, 2, 0, t_range);    
+    itoa(options, c_options, 10);
+    itoa(COOL, c_cool, 10);
+    itoa(MOISTURE, c_moisture, 10);
+    strcpy(c_writeapikey,  writeAPIKey);
+    strcpy(c_readapikey, readAPIKey);
+    strcpy(c_auth, auth);
+    ltoa(channelID, c_channelid, 10);    
+  }
 
   Serial.println();
   Serial.print("Temperature : ");
@@ -214,10 +228,11 @@ void setup() {
   Serial.println(writeAPIKey);
   Serial.print("Read API Key : ");
   Serial.println(readAPIKey);
-  Serial.print("auth token : ");
-  Serial.println(auth);
   Serial.print("Channel ID : ");
   Serial.println(channelID);
+  Serial.print("auth token : ");
+  Serial.println(auth);
+  
 
   if (temperature_setpoint > 100 || temperature_setpoint < 0) {
     temperature_setpoint = 30;
@@ -247,7 +262,6 @@ void setup() {
     MOISTURE = 0;
     shouldSaveConfig = true;
   }
-
 
   WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
   WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
@@ -279,8 +293,9 @@ void setup() {
     wifiManager.addParameter(&custom_c_moisture);
     wifiManager.addParameter(&custom_c_writeapikey);
     wifiManager.addParameter(&custom_c_readapikey);
-    wifiManager.addParameter(&custom_c_auth);
     wifiManager.addParameter(&custom_c_channelid);
+    wifiManager.addParameter(&custom_c_auth);
+    
 
 
     //reset saved settings
@@ -361,11 +376,11 @@ void setup() {
       Serial.println(writeAPIKey);
       Serial.print("Read API Key : ");
       Serial.println(readAPIKey);
-      Serial.print("auth token : ");
-      Serial.println(auth);
       Serial.print("Channel ID : ");
       Serial.println(channelID);
-
+      Serial.print("auth token : ");
+      Serial.println(auth);
+      
       eeWriteInt(0, atoi(h_setpoint));
       eeWriteInt(4, atoi(h_range));
       eeWriteInt(8, atoi(t_setpoint));
@@ -377,7 +392,7 @@ void setup() {
       writeEEPROM(readAPIKey, 44, 16);
       writeEEPROM(auth, 60, 32);
       EEPROMWritelong(92, (long) channelID);
-
+      eeWriteInt(500, 6550);
     }
 
     ThingSpeak.begin( client );
@@ -387,7 +402,17 @@ void setup() {
     // microgear.connect(APPID);
 
     Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
-    Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+    boolean result = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+    Serial.print("Blynk connect : ");
+    Serial.println(result);
+    if(!Blynk.connected()){
+      Serial.println("Not connected to Blynk server"); 
+      Blynk.connect(3333);  // try to connect to server with default timeout
+    }
+    else {
+      Serial.println("Connected to Blynk server");     
+    }
+    
     // Setup a function to be called every second
     blynktimer.setInterval(15000L, sendSensor);
     // statustimer.setInterval(5000L, sendStatus);
