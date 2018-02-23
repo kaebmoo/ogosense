@@ -939,26 +939,33 @@ BLYNK_WRITE(V1)
   int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
 
   // process received value
+  Serial.print("Pin Value : ");
   Serial.println(pinValue);
-  if (pinValue == 1) {
-    turnrelay_onoff(HIGH);
-    RelayEvent = true;
+  if (!AUTO) {
+    if (pinValue == 1) {
+      turnrelay_onoff(HIGH);
+      RelayEvent = true;
+    }
+    else {
+      turnrelay_onoff(LOW);
+      if (afterStart != -1) {
+            t_relay.stop(afterStart);
+  
+      }
+      if (afterStop != -1) {
+        t_delayStart.stop(afterStop);
+      }
+  
+      RelayEvent = false;
+      afterStart = -1;
+      afterStop = -1;
+  
+    }
   }
   else {
-    turnrelay_onoff(LOW);
-    if (afterStart != -1) {
-          t_relay.stop(afterStart);
-
-    }
-    if (afterStop != -1) {
-      t_delayStart.stop(afterStop);
-    }
-
-    RelayEvent = false;
-    afterStart = -1;
-    afterStop = -1;
-
+    Serial.println("auto mode!");
   }
+  
   Serial.print(" RelayEvent = ");
   Serial.print(RelayEvent);
   Serial.print(" afterStart = ");
