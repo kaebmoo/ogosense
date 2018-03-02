@@ -195,18 +195,18 @@ void setup() {
   channelID = (unsigned long) EEPROMReadlong(92);
 
   int saved = eeGetInt(500);
-  if (saved == 6550) {  
+  if (saved == 6550) {
     dtostrf(humidity_setpoint, 2, 0, h_setpoint);
     dtostrf(humidity_range, 2, 0, h_range);
     dtostrf(temperature_setpoint, 2, 0, t_setpoint);
-    dtostrf(temperature_range, 2, 0, t_range);    
+    dtostrf(temperature_range, 2, 0, t_range);
     itoa(options, c_options, 10);
     itoa(COOL, c_cool, 10);
     itoa(MOISTURE, c_moisture, 10);
     strcpy(c_writeapikey,  writeAPIKey);
     strcpy(c_readapikey, readAPIKey);
     strcpy(c_auth, auth);
-    ltoa(channelID, c_channelid, 10);    
+    ltoa(channelID, c_channelid, 10);
   }
 
   Serial.println();
@@ -232,7 +232,7 @@ void setup() {
   Serial.println(channelID);
   Serial.print("auth token : ");
   Serial.println(auth);
-  
+
 
   if (temperature_setpoint > 100 || temperature_setpoint < 0) {
     temperature_setpoint = 30;
@@ -295,7 +295,7 @@ void setup() {
     wifiManager.addParameter(&custom_c_readapikey);
     wifiManager.addParameter(&custom_c_channelid);
     wifiManager.addParameter(&custom_c_auth);
-    
+
 
 
     //reset saved settings
@@ -380,7 +380,7 @@ void setup() {
       Serial.println(channelID);
       Serial.print("auth token : ");
       Serial.println(auth);
-      
+
       eeWriteInt(0, atoi(h_setpoint));
       eeWriteInt(4, atoi(h_range));
       eeWriteInt(8, atoi(t_setpoint));
@@ -406,13 +406,13 @@ void setup() {
     Serial.print("Blynk connect : ");
     Serial.println(result);
     if(!Blynk.connected()){
-      Serial.println("Not connected to Blynk server"); 
+      Serial.println("Not connected to Blynk server");
       Blynk.connect(3333);  // try to connect to server with default timeout
     }
     else {
-      Serial.println("Connected to Blynk server");     
+      Serial.println("Connected to Blynk server");
     }
-    
+
     // Setup a function to be called every second
     blynktimer.setInterval(15000L, sendSensor);
     // statustimer.setInterval(5000L, sendStatus);
@@ -679,6 +679,7 @@ void turnrelay_onoff(uint8_t value)
       Serial.println("RELAY1 ON");
       digitalWrite(LED_BUILTIN, LOW);  // turn on
       led1.on();
+      Blynk.virtualWrite(V1, 1);
       buzzer_sound();
     }
     else if (value == LOW) {
@@ -686,6 +687,7 @@ void turnrelay_onoff(uint8_t value)
       Serial.println("RELAY1 OFF");
       digitalWrite(LED_BUILTIN, HIGH);  // turn off
       led1.off();
+      Blynk.virtualWrite(V1, 0);
       buzzer_sound();
     }
 }
@@ -950,22 +952,22 @@ BLYNK_WRITE(V1)
       turnrelay_onoff(LOW);
       if (afterStart != -1) {
             t_relay.stop(afterStart);
-  
+
       }
       if (afterStop != -1) {
         t_delayStart.stop(afterStop);
       }
-  
+
       RelayEvent = false;
       afterStart = -1;
       afterStop = -1;
-  
+
     }
   }
   else {
     Serial.println("auto mode!");
   }
-  
+
   Serial.print(" RelayEvent = ");
   Serial.print(RelayEvent);
   Serial.print(" afterStart = ");
@@ -1078,11 +1080,33 @@ BLYNK_WRITE(V27)
 BLYNK_CONNECTED()
 {
   Serial.println("Blynk Connected");
-  Blynk.syncAll();
-  // Blynk.syncVirtual(V1);
-  // Blynk.syncVirtual(V2);
-  // Blynk.virtualWrite(V1, digitalRead(RELAY1));
-  // Blynk.virtualWrite(V2, AUTO);
+  // Blynk.syncAll();
+
+  int relay_status = digitalRead(RELAY1);
+  Blynk.virtualWrite(V1, relay_status);
+  if (relay_status == 1) {
+    led1.on();
+  }
+  else {
+    led1.off();
+  }
+  if (AUTO) {
+    Blynk.virtualWrite(V2, 1);
+    led2.on();
+  }
+  else {
+    Blynk.virtualWrite(V2, 0);
+    led2.off();
+    Blynk.syncVirtual(V1);
+  }
+  Blynk.syncVirtual(V20);
+  Blynk.syncVirtual(V21);
+  Blynk.syncVirtual(V22);
+  Blynk.syncVirtual(V23);
+  Blynk.syncVirtual(V24);
+  Blynk.syncVirtual(V25);
+  Blynk.syncVirtual(V26);
+  Blynk.syncVirtual(V27);
 }
 
 // This function sends Arduino's up time every second to Virtual Pin (5).
@@ -1119,6 +1143,7 @@ void sendStatus()
       led3.off();
     }
 }
+
 void reconnectBlynk() {
   if (!Blynk.connected()) {
     if(Blynk.connect()) {
