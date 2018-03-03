@@ -140,7 +140,7 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 //flag for saving data
 bool shouldSaveConfig = false;
 
-BlynkTimer blynktimer, statustimer;
+BlynkTimer blynktimer, statustimer, checkConnectionTimer;
 Timer t_relay, t_delayStart, timer_delaysend, timer_readsensor;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
@@ -423,6 +423,7 @@ void setup() {
     buzzer_sound();
 
     timer_readsensor.every(5000, temp_humi_sensor);
+    checkConnectionTimer.setInterval(2000L, reconnectBlynk);
 
     // Blynk.setProperty(V1, "color", "#D3435C");
 }
@@ -457,7 +458,7 @@ void loop() {
   Blynk.run();
   blynktimer.run();
   statustimer.run();
-
+  checkConnectionTimer.run();
 
 }
 
@@ -645,6 +646,16 @@ void temp_humi_sensor()
     else
     {
       Serial.println("Sensor Error!");
+    }
+  }
+}
+
+void reconnectBlynk() {
+  if (!Blynk.connected()) {
+    if(Blynk.connect()) {
+      BLYNK_LOG("Blynk Reconnected");
+    } else {
+      BLYNK_LOG("Blynk Not reconnected");
     }
   }
 }
@@ -1142,16 +1153,6 @@ void sendStatus()
       ledStatus = LOW;
       led3.off();
     }
-}
-
-void reconnectBlynk() {
-  if (!Blynk.connected()) {
-    if(Blynk.connect()) {
-      BLYNK_LOG("Reconnected");
-    } else {
-      BLYNK_LOG("Not reconnected");
-    }
-  }
 }
 
 void buzzer_sound()
