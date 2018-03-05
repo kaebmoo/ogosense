@@ -46,6 +46,22 @@ SOFTWARE.
 #include <Timer.h>
 #include <MicroGear.h>
 
+#include <WiFiClient.h>
+#include <ESP8266mDNS.h>
+#include <ESP8266HTTPUpdateServer.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+
+const char* host = "ogosense-webupdate";
+const char* update_path = "/firmware";
+const char* update_username = "admin";
+const char* update_password = "ogosense";
+const int FW_VERSION = 1;
+const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
+String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
+ESP8266WebServer httpServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
+
 #define APPID   "OgoSense"                  // application id from netpie
 #define KEY     "sYZknE19LHxr1zJ"           // key from netpie
 #define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
@@ -141,7 +157,7 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 bool shouldSaveConfig = false;
 
 BlynkTimer blynktimer, statustimer, checkConnectionTimer;
-Timer t_relay, t_delayStart, timer_delaysend, timer_readsensor;         // timer for ON period and delay start
+Timer t_relay, t_delayStart, timer_delaysend, timer_readsensor, checkFirmware;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
@@ -395,6 +411,16 @@ void setup() {
       eeWriteInt(500, 6550);
     }
 
+
+    // web update OTA
+    String host_update_name;
+    host_update_name = "ogoswitch-"+String(ESP.getChipId());
+    MDNS.begin(host_update_name.c_str());
+    httpUpdater.setup(&httpServer, update_path, update_username, update_password);
+    httpServer.begin();
+    MDNS.addService("http", "tcp", 80);
+    Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);
+
     ThingSpeak.begin( client );
 
     // microgear.useTLS(true);
@@ -424,7 +450,8 @@ void setup() {
 
     timer_readsensor.every(5000, temp_humi_sensor);
     checkConnectionTimer.setInterval(2000L, reconnectBlynk);
-
+    checkFirmware.every(86400000L, upintheair);
+    upintheair();
     // Blynk.setProperty(V1, "color", "#D3435C");
 }
 
@@ -454,6 +481,7 @@ void loop() {
   t_delayStart.update();
   timer_delaysend.update();
   timer_readsensor.update();
+  checkFirmware.update();
 
   Blynk.run();
   blynktimer.run();
@@ -649,6 +677,62 @@ void temp_humi_sensor()
     }
   }
 }
+
+void upintheair()
+{
+  String fwURL = String( firmwareUrlBase );
+  fwURL.concat( firmware_name );
+  String fwVersionURL = fwURL;
+  fwVersionURL.concat( ".version" );
+
+  Serial.println( "Checking for firmware updates." );
+  // Serial.print( "MAC address: " );
+  // Serial.println( mac );
+  Serial.print( "Firmware version URL: " );
+  Serial.println( fwVersionURL );
+
+  HTTPClient httpClient;
+  httpClient.begin( fwVersionURL );
+  int httpCode = httpClient.GET();
+  if( httpCode == 200 ) {
+    String newFWVersion = httpClient.getString();
+
+    Serial.print( "Current firmware version: " );
+    Serial.println( FW_VERSION );
+    Serial.print( "Available firmware version: " );
+    Serial.println( newFWVersion );
+
+    int newVersion = newFWVersion.toInt();
+
+    if( newVersion > FW_VERSION ) {
+      Serial.println( "Preparing to update" );
+
+      String fwImageURL = fwURL;
+      fwImageURL.concat( ".bin" );
+      t_httpUpdate_return ret = ESPhttpUpdate.update( fwImageURL );
+
+      switch(ret) {
+        case HTTP_UPDATE_FAILED:
+          Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+          break;
+
+        case HTTP_UPDATE_NO_UPDATES:
+          Serial.println("HTTP_UPDATE_NO_UPDATES");
+          break;
+      }
+    }
+    else {
+      Serial.println( "Already on latest version" );
+    }
+  }
+  else {
+    Serial.print( "Firmware version check failed, got HTTP response code " );
+    Serial.println( httpCode );
+  }
+  httpClient.end();
+  // ESPhttpUpdate.update("www.ogonan.com", 80, "/ogoupdate/ogoswitch_blynk.ino.d1_mini.bin");
+}
+
 
 void reconnectBlynk() {
   if (!Blynk.connected()) {
