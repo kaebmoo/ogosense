@@ -56,11 +56,12 @@ const char* host = "ogosense-webupdate";
 const char* update_path = "/firmware";
 const char* update_username = "admin";
 const char* update_password = "ogosense";
+ESP8266WebServer httpServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
 const int FW_VERSION = 1;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 String firmware_name = "ogoswitch_th_minimal_blynk.ino.ino.d1_mini"; // ogoswitch_th_minimal_blynk.ino.ino.d1_mini
-ESP8266WebServer httpServer(80);
-ESP8266HTTPUpdateServer httpUpdater;
+
 
 #define APPID   "OgoSense"                  // application id from netpie
 #define KEY     "sYZknE19LHxr1zJ"           // key from netpie
@@ -250,7 +251,7 @@ void setup() {
   Serial.println(channelID);
   Serial.print("auth token : ");
   Serial.println(auth);
-  
+
 
   if (temperature_setpoint > 100 || temperature_setpoint < 0) {
     temperature_setpoint = 30;
@@ -293,7 +294,7 @@ void setup() {
   WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key", c_readapikey, 17);
   WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
   WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
-  
+
 
 
     //WiFiManager
@@ -315,7 +316,7 @@ void setup() {
     wifiManager.addParameter(&custom_c_readapikey);
     wifiManager.addParameter(&custom_c_channelid);
     wifiManager.addParameter(&custom_c_auth);
-    
+
 
 
     //reset saved settings
@@ -395,7 +396,7 @@ void setup() {
       Serial.print("Write API Key : ");
       Serial.println(writeAPIKey);
       Serial.print("Read API Key : ");
-      Serial.println(readAPIKey);      
+      Serial.println(readAPIKey);
       Serial.print("Channel ID : ");
       Serial.println(channelID);
       Serial.print("auth token : ");
@@ -441,7 +442,7 @@ void setup() {
     else {
       Serial.println("Connected to Blynk server");
     }
-    
+
     // Setup a function to be called every second
     blynktimer.setInterval(15000L, sendSensor);
     // statustimer.setInterval(5000L, sendStatus);
@@ -1040,20 +1041,20 @@ BLYNK_WRITE(V1)
       turnrelay_onoff(LOW);
       if (afterStart != -1) {
             t_relay.stop(afterStart);
-  
+
       }
       if (afterStop != -1) {
         t_delayStart.stop(afterStop);
       }
-  
+
       RelayEvent = false;
       afterStart = -1;
       afterStop = -1;
-  
+
     }
   }
-  else {    
-    Serial.println("auto mode!");   
+  else {
+    Serial.println("auto mode!");
   }
   Serial.print(" RelayEvent = ");
   Serial.print(RelayEvent);
@@ -1193,7 +1194,7 @@ BLYNK_CONNECTED()
   Blynk.syncVirtual(V25);
   Blynk.syncVirtual(V26);
   Blynk.syncVirtual(V27);
-   
+
 }
 
 // This function sends Arduino's up time every second to Virtual Pin (5).
