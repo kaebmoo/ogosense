@@ -58,7 +58,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 const int FW_VERSION = 1;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
-String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
+String firmware_name = "ogoswitch_th_minimal_blynk.ino.ino.d1_mini"; // ogoswitch_th_minimal_blynk.ino.ino.d1_mini
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
 
