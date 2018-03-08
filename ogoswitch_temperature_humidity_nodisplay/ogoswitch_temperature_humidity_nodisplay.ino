@@ -288,8 +288,9 @@ void setup() {
   WiFiManagerParameter custom_c_moisture("c_moisture", "MOISTURE : 0,1", c_moisture, 6);
   WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key", c_writeapikey, 17);
   WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key", c_readapikey, 17);
-  WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
   WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
+  WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
+  
 
 
     //WiFiManager
@@ -731,17 +732,6 @@ void upintheair()
   }
   httpClient.end();
   // ESPhttpUpdate.update("www.ogonan.com", 80, "/ogoupdate/ogoswitch_blynk.ino.d1_mini.bin");
-}
-
-
-void reconnectBlynk() {
-  if (!Blynk.connected()) {
-    if(Blynk.connect()) {
-      BLYNK_LOG("Blynk Reconnected");
-    } else {
-      BLYNK_LOG("Blynk Not reconnected");
-    }
-  }
 }
 
 void segment_display()
@@ -1237,6 +1227,16 @@ void sendStatus()
       ledStatus = LOW;
       led3.off();
     }
+}
+
+void reconnectBlynk() {
+  if (!Blynk.connected()) {
+    if(Blynk.connect()) {
+      BLYNK_LOG("Blynk Reconnected");
+    } else {
+      BLYNK_LOG("Blynk Not reconnected");
+    }
+  }
 }
 
 void buzzer_sound()

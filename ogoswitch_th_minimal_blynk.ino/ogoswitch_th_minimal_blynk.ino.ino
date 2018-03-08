@@ -46,6 +46,22 @@ SOFTWARE.
 #include <Timer.h>
 #include <MicroGear.h>
 
+#include <WiFiClient.h>
+#include <ESP8266mDNS.h>
+#include <ESP8266HTTPUpdateServer.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+
+const char* host = "ogosense-webupdate";
+const char* update_path = "/firmware";
+const char* update_username = "admin";
+const char* update_password = "ogosense";
+const int FW_VERSION = 1;
+const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
+String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
+ESP8266WebServer httpServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
+
 #define APPID   "OgoSense"                  // application id from netpie
 #define KEY     "sYZknE19LHxr1zJ"           // key from netpie
 #define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
@@ -118,7 +134,7 @@ char c_auth[33] = "";           // authen token blynk
 char c_channelid[8] = "";       // channel id thingspeak
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
-
+int SAVE = 6550;      // Configuration save : if 6550 = saved
 int COOL = 1;        // true > set point, false < set point = HEAT mode
 int MOISTURE = 0;   // true < set point; false > set point
 boolean tempon = false;     // flag ON/OFF
@@ -141,8 +157,8 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 //flag for saving data
 bool shouldSaveConfig = false;
 
-BlynkTimer blynktimer, statustimer;
-Timer t_relay, t_delayStart, timer_delaysend, timer_readsensor;         // timer for ON period and delay start
+BlynkTimer blynktimer, statustimer, checkConnectionTimer;
+Timer t_relay, t_delayStart, timer_delaysend, timer_readsensor, checkFirmware;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
@@ -195,6 +211,20 @@ void setup() {
   readEEPROM(auth, 60, 32);
   channelID = (unsigned long) EEPROMReadlong(92);
 
+  int saved = eeGetInt(500);
+  if (saved == 6550) {
+    dtostrf(humidity_setpoint, 2, 0, h_setpoint);
+    dtostrf(humidity_range, 2, 0, h_range);
+    dtostrf(temperature_setpoint, 2, 0, t_setpoint);
+    dtostrf(temperature_range, 2, 0, t_range);
+    itoa(options, c_options, 10);
+    itoa(COOL, c_cool, 10);
+    itoa(MOISTURE, c_moisture, 10);
+    strcpy(c_writeapikey,  writeAPIKey);
+    strcpy(c_readapikey, readAPIKey);
+    strcpy(c_auth, auth);
+    ltoa(channelID, c_channelid, 10);
+  }
 
 
   Serial.println();
@@ -216,17 +246,18 @@ void setup() {
   Serial.println(writeAPIKey);
   Serial.print("Read API Key : ");
   Serial.println(readAPIKey);
-  Serial.print("auth token : ");
-  Serial.println(auth);
   Serial.print("Channel ID : ");
   Serial.println(channelID);
+  Serial.print("auth token : ");
+  Serial.println(auth);
+  
 
   if (temperature_setpoint > 100 || temperature_setpoint < 0) {
     temperature_setpoint = 30;
     shouldSaveConfig = true;
   }
   if (temperature_range > 100 || temperature_range < 0) {
-    temperature_range = 4;
+    temperature_range = 2;
     shouldSaveConfig = true;
   }
   if (humidity_setpoint > 100 || humidity_setpoint < 0) {
@@ -234,7 +265,7 @@ void setup() {
     shouldSaveConfig = true;
   }
   if (humidity_range > 100 || humidity_range < 0) {
-    humidity_range = 20;
+    humidity_range = 5;
     shouldSaveConfig = true;
   }
   if (options > 2 || options < 0) {
@@ -260,8 +291,9 @@ void setup() {
   WiFiManagerParameter custom_c_moisture("c_moisture", "MOISTURE : 0,1", c_moisture, 6);
   WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key", c_writeapikey, 17);
   WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key", c_readapikey, 17);
-  WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
   WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
+  WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
+  
 
 
     //WiFiManager
@@ -281,8 +313,9 @@ void setup() {
     wifiManager.addParameter(&custom_c_moisture);
     wifiManager.addParameter(&custom_c_writeapikey);
     wifiManager.addParameter(&custom_c_readapikey);
-    wifiManager.addParameter(&custom_c_auth);
     wifiManager.addParameter(&custom_c_channelid);
+    wifiManager.addParameter(&custom_c_auth);
+    
 
 
     //reset saved settings
@@ -362,11 +395,11 @@ void setup() {
       Serial.print("Write API Key : ");
       Serial.println(writeAPIKey);
       Serial.print("Read API Key : ");
-      Serial.println(readAPIKey);
-      Serial.print("auth token : ");
-      Serial.println(auth);
+      Serial.println(readAPIKey);      
       Serial.print("Channel ID : ");
       Serial.println(channelID);
+      Serial.print("auth token : ");
+      Serial.println(auth);
 
       eeWriteInt(0, atoi(h_setpoint));
       eeWriteInt(4, atoi(h_range));
@@ -379,8 +412,17 @@ void setup() {
       writeEEPROM(readAPIKey, 44, 16);
       writeEEPROM(auth, 60, 32);
       EEPROMWritelong(92, (long) channelID);
-
+      eeWriteInt(500, 6550);
     }
+
+    // web update OTA
+    String host_update_name;
+    host_update_name = "ogoswitch-"+String(ESP.getChipId());
+    MDNS.begin(host_update_name.c_str());
+    httpUpdater.setup(&httpServer, update_path, update_username, update_password);
+    httpServer.begin();
+    MDNS.addService("http", "tcp", 80);
+    Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);
 
     ThingSpeak.begin( client );
 
@@ -389,7 +431,17 @@ void setup() {
     // microgear.connect(APPID);
 
     Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
-    Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+    boolean result = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+    Serial.print("Blynk connect : ");
+    Serial.println(result);
+    if(!Blynk.connected()){
+      Serial.println("Not connected to Blynk server");
+      Blynk.connect(3333);  // try to connect to server with default timeout
+    }
+    else {
+      Serial.println("Connected to Blynk server");
+    }
+    
     // Setup a function to be called every second
     blynktimer.setInterval(15000L, sendSensor);
     // statustimer.setInterval(5000L, sendStatus);
@@ -400,6 +452,9 @@ void setup() {
     buzzer_sound();
 
     timer_readsensor.every(5000, temp_humi_sensor);
+    checkConnectionTimer.setInterval(2000L, reconnectBlynk);
+    checkFirmware.every(86400000L, upintheair);
+    upintheair();
 
     // Blynk.setProperty(V1, "color", "#D3435C");
 }
@@ -430,11 +485,12 @@ void loop() {
   t_delayStart.update();
   timer_delaysend.update();
   timer_readsensor.update();
+  checkFirmware.update();
 
   Blynk.run();
   blynktimer.run();
   statustimer.run();
-
+  checkConnectionTimer.run();
 
 }
 
@@ -626,6 +682,61 @@ void temp_humi_sensor()
   }
 }
 
+void upintheair()
+{
+  String fwURL = String( firmwareUrlBase );
+  fwURL.concat( firmware_name );
+  String fwVersionURL = fwURL;
+  fwVersionURL.concat( ".version" );
+
+  Serial.println( "Checking for firmware updates." );
+  // Serial.print( "MAC address: " );
+  // Serial.println( mac );
+  Serial.print( "Firmware version URL: " );
+  Serial.println( fwVersionURL );
+
+  HTTPClient httpClient;
+  httpClient.begin( fwVersionURL );
+  int httpCode = httpClient.GET();
+  if( httpCode == 200 ) {
+    String newFWVersion = httpClient.getString();
+
+    Serial.print( "Current firmware version: " );
+    Serial.println( FW_VERSION );
+    Serial.print( "Available firmware version: " );
+    Serial.println( newFWVersion );
+
+    int newVersion = newFWVersion.toInt();
+
+    if( newVersion > FW_VERSION ) {
+      Serial.println( "Preparing to update" );
+
+      String fwImageURL = fwURL;
+      fwImageURL.concat( ".bin" );
+      t_httpUpdate_return ret = ESPhttpUpdate.update( fwImageURL );
+
+      switch(ret) {
+        case HTTP_UPDATE_FAILED:
+          Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+          break;
+
+        case HTTP_UPDATE_NO_UPDATES:
+          Serial.println("HTTP_UPDATE_NO_UPDATES");
+          break;
+      }
+    }
+    else {
+      Serial.println( "Already on latest version" );
+    }
+  }
+  else {
+    Serial.print( "Firmware version check failed, got HTTP response code " );
+    Serial.println( httpCode );
+  }
+  httpClient.end();
+  // ESPhttpUpdate.update("www.ogonan.com", 80, "/ogoupdate/ogoswitch_blynk.ino.d1_mini.bin");
+}
+
 void segment_display()
 {
     float tempdisplay = sht30.cTemp * 10;
@@ -656,6 +767,7 @@ void turnrelay_onoff(uint8_t value)
       Serial.println("RELAY1 ON");
       digitalWrite(LED_BUILTIN, LOW);  // turn on
       led1.on();
+      Blynk.virtualWrite(V1, 1);
       buzzer_sound();
     }
     else if (value == LOW) {
@@ -663,6 +775,7 @@ void turnrelay_onoff(uint8_t value)
       Serial.println("RELAY1 OFF");
       digitalWrite(LED_BUILTIN, HIGH);  // turn off
       led1.off();
+      Blynk.virtualWrite(V1, 0);
       buzzer_sound();
     }
 }
@@ -916,25 +1029,31 @@ BLYNK_WRITE(V1)
   int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
 
   // process received value
+  Serial.print("Pin Value : ");
   Serial.println(pinValue);
-  if (pinValue == 1) {
-    turnrelay_onoff(HIGH);
-    RelayEvent = true;
+  if (!AUTO) {
+    if (pinValue == 1) {
+      turnrelay_onoff(HIGH);
+      RelayEvent = true;
+    }
+    else {
+      turnrelay_onoff(LOW);
+      if (afterStart != -1) {
+            t_relay.stop(afterStart);
+  
+      }
+      if (afterStop != -1) {
+        t_delayStart.stop(afterStop);
+      }
+  
+      RelayEvent = false;
+      afterStart = -1;
+      afterStop = -1;
+  
+    }
   }
-  else {
-    turnrelay_onoff(LOW);
-    if (afterStart != -1) {
-          t_relay.stop(afterStart);
-
-    }
-    if (afterStop != -1) {
-      t_delayStart.stop(afterStop);
-    }
-
-    RelayEvent = false;
-    afterStart = -1;
-    afterStop = -1;
-
+  else {    
+    Serial.println("auto mode!");   
   }
   Serial.print(" RelayEvent = ");
   Serial.print(RelayEvent);
@@ -1048,11 +1167,33 @@ BLYNK_WRITE(V27)
 BLYNK_CONNECTED()
 {
   Serial.println("Blynk Connected");
-  Blynk.syncAll();
-  // Blynk.syncVirtual(V1);
-  // Blynk.syncVirtual(V2);
-  // Blynk.virtualWrite(V1, digitalRead(RELAY1));
-  // Blynk.virtualWrite(V2, AUTO);
+  // Blynk.syncAll();
+  int relay_status = digitalRead(RELAY1);
+  Blynk.virtualWrite(V1, relay_status);
+  if (relay_status == 1) {
+    led1.on();
+  }
+  else {
+    led1.off();
+  }
+  if (AUTO) {
+    Blynk.virtualWrite(V2, 1);
+    led2.on();
+  }
+  else {
+    Blynk.virtualWrite(V2, 0);
+    led2.off();
+    Blynk.syncVirtual(V1);
+  }
+  Blynk.syncVirtual(V20);
+  Blynk.syncVirtual(V21);
+  Blynk.syncVirtual(V22);
+  Blynk.syncVirtual(V23);
+  Blynk.syncVirtual(V24);
+  Blynk.syncVirtual(V25);
+  Blynk.syncVirtual(V26);
+  Blynk.syncVirtual(V27);
+   
 }
 
 // This function sends Arduino's up time every second to Virtual Pin (5).
