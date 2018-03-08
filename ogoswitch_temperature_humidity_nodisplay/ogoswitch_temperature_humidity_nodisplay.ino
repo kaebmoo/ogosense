@@ -56,11 +56,12 @@ const char* host = "ogosense-webupdate";
 const char* update_path = "/firmware";
 const char* update_username = "admin";
 const char* update_password = "ogosense";
+ESP8266WebServer httpServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
 const int FW_VERSION = 1;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
-ESP8266WebServer httpServer(80);
-ESP8266HTTPUpdateServer httpUpdater;
+
 
 #define APPID   "OgoSense"                  // application id from netpie
 #define KEY     "sYZknE19LHxr1zJ"           // key from netpie
@@ -290,7 +291,7 @@ void setup() {
   WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key", c_readapikey, 17);
   WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
   WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
-  
+
 
 
     //WiFiManager
