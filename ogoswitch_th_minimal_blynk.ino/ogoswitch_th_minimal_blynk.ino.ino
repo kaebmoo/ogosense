@@ -58,7 +58,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 1;
+const int FW_VERSION = 4;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 String firmware_name = "ogoswitch_th_minimal_blynk.ino.ino.d1_mini"; // ogoswitch_th_minimal_blynk.ino.ino.d1_mini
 
@@ -111,9 +111,9 @@ TM1637Display display(CLK, DIO); //set up the 4-Digit Display.
 SHT3X sht30(0x45);                          // address sensor
 
 float maxtemp = 30.0;
-float mintemp = 26.0;
-float maxhumidity = 70.0;
-float minhumidity = 40.0;
+float mintemp = 25.0;
+float maxhumidity = 60.0;
+float minhumidity = 50.0;
 
 float temperature_setpoint = 30.0;  // 30.0 set point
 float temperature_range = 4.0;      // +- 4.0 from set point
@@ -123,9 +123,9 @@ float humidity_range = 20;          // +- 20 from set point
 
 // set for wifimanager to get value from user
 char t_setpoint[6] = "30";
-char t_range[6] = "2";
+char t_range[6] = "5";
 char h_setpoint[6] = "60";
-char h_range[6] = "5";
+char h_range[6] = "10";
 char c_options[6] = "1";
 char c_cool[6] = "1";
 char c_moisture[6] = "0";
@@ -258,7 +258,7 @@ void setup() {
     shouldSaveConfig = true;
   }
   if (temperature_range > 100 || temperature_range < 0) {
-    temperature_range = 2;
+    temperature_range = 5;
     shouldSaveConfig = true;
   }
   if (humidity_setpoint > 100 || humidity_setpoint < 0) {
@@ -266,7 +266,7 @@ void setup() {
     shouldSaveConfig = true;
   }
   if (humidity_range > 100 || humidity_range < 0) {
-    humidity_range = 5;
+    humidity_range = 10;
     shouldSaveConfig = true;
   }
   if (options > 2 || options < 0) {
@@ -1130,11 +1130,18 @@ BLYNK_WRITE(V23)
 BLYNK_WRITE(V24)
 {
   int stepperValue = param.asInt();
+  String label;
 
   Serial.print("Temperature setpoint: ");
   Serial.println(stepperValue);
   temperature_setpoint = stepperValue;
-
+  if (COOL) {
+    label = "°C : Cool Mode";
+  }
+  else {
+    label = "°C : Heat Mode";
+  }
+  Blynk.setProperty(V24, "label", label.c_str());
 }
 
 BLYNK_WRITE(V25)
@@ -1149,10 +1156,18 @@ BLYNK_WRITE(V25)
 BLYNK_WRITE(V26)
 {
   int stepperValue = param.asInt();
+  String label;
 
   Serial.print("Humidity setpoint: ");
   Serial.println(stepperValue);
   humidity_setpoint = stepperValue;
+  if (MOISTURE) {
+    label = "RH % : Moisture Mode";
+  }
+  else {
+    label = "RH % : Dehumidifier Mode";
+  }
+  Blynk.setProperty(V26, "label", label.c_str());
 }
 
 BLYNK_WRITE(V27)
@@ -1205,7 +1220,7 @@ void sendSensor()
   float h = sht30.humidity;
   float t = sht30.cTemp;
   char str[64] = "";
-  String newColor;
+  String newColor, label;
 
   if (isnan(h) || isnan(t)) {
     Serial.println("Failed to read from sensor!");
@@ -1214,6 +1229,15 @@ void sendSensor()
   dtostrf(t, 4, 1, str);
   // You can send any value at any time.
   // Please don't send more that 10 values per second.
+  if (options == 0) {
+    label = "Humidity Option";
+  }
+  else if (options == 1) {
+    label = "Temperature Option";
+  }
+  else if (options == 2) {
+    label = "Both Option";
+  }
 
   if(toggleDisplay) {
 
@@ -1229,7 +1253,7 @@ void sendSensor()
       gaugeColor = newColor;
       Blynk.setProperty(V5, "color", gaugeColor);
     }
-    Blynk.setProperty(V5, "label", "Temperature °C");
+    Blynk.setProperty(V5, "label", "Temperature °C  : " + String(label));
     strcat(str, " °C");
     Serial.println(str);
     Blynk.virtualWrite(V5, str);
@@ -1239,7 +1263,7 @@ void sendSensor()
     newColor = BLYNK_BLUE;
     gaugeColor = newColor;
     Blynk.setProperty(V5, "color", gaugeColor);
-    Blynk.setProperty(V5, "label", "Relative Humidity %");
+    Blynk.setProperty(V5, "label", "Relative Humidity %  : " + String(label));
     dtostrf(h, 4, 0, str);
     strcat(str, " %");
     Serial.println(str);
