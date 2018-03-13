@@ -67,9 +67,9 @@ String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; /
 #define KEY     "sYZknE19LHxr1zJ"           // key from netpie
 #define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
 
-String ALIAS = "OgoSense0000";              // alias name netpie
-char *me = "/mam/0000000";                  // topic set for sensor box
-char *mystatus = "/mam/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
+String ALIAS = "ogosense-0000";              // alias name netpie
+char *me = "/ogosense/0000000";                  // topic set for sensor box
+char *mystatus = "/ogosense/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
@@ -93,6 +93,9 @@ char auth[] = "27092c0fc50343bc917a97c755012c9b";
 WidgetLED led1(10); //virtual led
 WidgetLED led2(11); // Auto status
 WidgetLED led3(12); // Box status
+
+int gauge1Push_reset;
+int gauge2Push_reset;
 
 int ledStatus = LOW;             // ledStatus used to set the LED
 const int chipSelect = D8; // SD CARD
@@ -135,8 +138,8 @@ char c_channelid[8] = "";       // channel id thingspeak
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 
 int SAVE = 6550;      // Configuration save : if 6550 = saved
-int COOL = 1;        // true > set point, false < set point = HEAT mode
-int MOISTURE = 0;   // true < set point; false > set point
+int COOL = 1;        // true > set point Cool mode, false < set point = HEAT mode
+int MOISTURE = 0;   // true < set point moisture mode ; false > set point Dehumidifier mode
 boolean tempon = false;     // flag ON/OFF
 boolean humion = false;     // flag ON/OFF
 boolean AUTO = true;       // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
@@ -172,7 +175,8 @@ const int MAXRETRY=4; // 0 - 4
 #define BLYNK_RED       "#D3435C"
 #define BLYNK_DARK_BLUE "#5F7CD8"
 
-void setup() {
+void setup()
+{
 
   Serial.begin(115200);
   Serial.println();
@@ -194,6 +198,41 @@ void setup() {
   microgear.on(MESSAGE,onMsghandler);
   microgear.on(CONNECTED,onConnected);
   microgear.setEEPROMOffset(116);
+
+
+  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
+  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
+  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
+  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
+  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
+  WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
+  WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
+  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
+  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
+  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
+  WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
+
+
+
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wifiManager;
+  String APName;
+
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  wifiManager.addParameter(&custom_t_setpoint);
+  wifiManager.addParameter(&custom_t_range);
+  wifiManager.addParameter(&custom_h_setpoint);
+  wifiManager.addParameter(&custom_h_range);
+  wifiManager.addParameter(&custom_c_options);
+  wifiManager.addParameter(&custom_c_cool);
+  wifiManager.addParameter(&custom_c_moisture);
+  wifiManager.addParameter(&custom_c_writeapikey);
+  wifiManager.addParameter(&custom_c_readapikey);
+  wifiManager.addParameter(&custom_c_channelid);
+  wifiManager.addParameter(&custom_c_auth);
 
 
 
@@ -224,7 +263,38 @@ void setup() {
     strcpy(c_readapikey, readAPIKey);
     strcpy(c_auth, auth);
     ltoa(channelID, c_channelid, 10);
+
+    //reset saved settings
+    //wifiManager.resetSettings();
+
+    //set custom ip for portal
+    //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+
+    //fetches ssid and pass from eeprom and tries to connect
+    //if it does not connect it starts an access point with the specified name
+    //here  "AutoConnectAP"
+    //and goes into a blocking loop awaiting configuration
+    //wifiManager.autoConnect("OgoSense");
+    //or use this for auto generated name ESP + ChipID
+    //wifiManager.autoConnect();
+
+    wifiManager.setTimeout(300);
+    APName = "OgoSense-"+String(ESP.getChipId());
+    if(!wifiManager.autoConnect(APName.c_str()) ) {
+      Serial.println("failed to connect and hit timeout");
+      delay(3000);
+      //reset and try again, or maybe put it to deep sleep
+      ESP.reset();
+      delay(5000);
+    }
   }
+  else {
+    ondemand_wifi_setup();
+  }
+
+  //if you get here you have connected to the WiFi
+  Serial.println("connected...yeey :)");
+
 
   Serial.println();
   Serial.print("Temperature : ");
@@ -280,181 +350,123 @@ void setup() {
     shouldSaveConfig = true;
   }
 
-  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
-  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
-  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
-  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
-  WiFiManagerParameter custom_c_options("c_options", "OPTION : 0,1,2", c_options, 6);
-  WiFiManagerParameter custom_c_cool("c_cool", "COOL : 0,1", c_cool, 6);
-  WiFiManagerParameter custom_c_moisture("c_moisture", "MOISTURE : 0,1", c_moisture, 6);
-  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key", c_writeapikey, 17);
-  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key", c_readapikey, 17);
-  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
-  WiFiManagerParameter custom_c_auth("c_auth", "Auth Token", c_auth, 37);
+
+  ALIAS = "ogosense-"+String(ESP.getChipId());
+  Serial.print(me);
+  Serial.print("\t");
+  Serial.print(ALIAS);
+  Serial.print("\t");
+  Serial.println(mystatus);
+
+  if (shouldSaveConfig) {
+    strcpy(t_setpoint, custom_t_setpoint.getValue());
+    strcpy(t_range, custom_t_range.getValue());
+    strcpy(h_setpoint, custom_h_setpoint.getValue());
+    strcpy(h_range, custom_h_range.getValue());
+    strcpy(c_options, custom_c_options.getValue());
+    strcpy(c_cool, custom_c_cool.getValue());
+    strcpy(c_moisture, custom_c_moisture.getValue());
+    strcpy(c_writeapikey, custom_c_writeapikey.getValue());
+    strcpy(c_readapikey, custom_c_readapikey.getValue());
+    strcpy(c_auth, custom_c_auth.getValue());
+    strcpy(c_channelid, custom_c_channelid.getValue());
+
+    temperature_setpoint = atol(t_setpoint);
+    temperature_range = atol(t_range);
+    humidity_setpoint = atol(h_setpoint);
+    humidity_range = atol(h_range);
+    options = atoi(c_options);
+    COOL = atoi(c_cool);
+    MOISTURE = atoi(c_moisture);
+    strcpy(writeAPIKey, c_writeapikey);
+    strcpy(readAPIKey, c_readapikey);
+    strcpy(auth, c_auth);
+    channelID = (unsigned long) atol(c_channelid);
+
+    Serial.print("Temperature : ");
+    Serial.println(t_setpoint);
+    Serial.print("Temperature Range : ");
+    Serial.println(t_range);
+    Serial.print("Humidity : ");
+    Serial.println(h_setpoint);
+    Serial.print("Humidity Range : ");
+    Serial.println(h_range);
+    Serial.print("Option : ");
+    Serial.println(c_options);
+    Serial.print("COOL : ");
+    Serial.println(COOL);
+    Serial.print("MOISTURE : ");
+    Serial.println(MOISTURE);
+    Serial.print("Write API Key : ");
+    Serial.println(writeAPIKey);
+    Serial.print("Read API Key : ");
+    Serial.println(readAPIKey);
+    Serial.print("Channel ID : ");
+    Serial.println(channelID);
+    Serial.print("auth token : ");
+    Serial.println(auth);
+
+    eeWriteInt(0, atoi(h_setpoint));
+    eeWriteInt(4, atoi(h_range));
+    eeWriteInt(8, atoi(t_setpoint));
+    eeWriteInt(12, atoi(t_range));
+    eeWriteInt(16, options);
+    eeWriteInt(20, COOL);
+    eeWriteInt(24, MOISTURE);
+    writeEEPROM(writeAPIKey, 28, 16);
+    writeEEPROM(readAPIKey, 44, 16);
+    writeEEPROM(auth, 60, 32);
+    EEPROMWritelong(92, (long) channelID);
+    eeWriteInt(500, 6550);
+  }
 
 
+  // web update OTA
+  String host_update_name;
+  host_update_name = "ogoswitch-"+String(ESP.getChipId());
+  MDNS.begin(host_update_name.c_str());
+  httpUpdater.setup(&httpServer, update_path, update_username, update_password);
+  httpServer.begin();
+  MDNS.addService("http", "tcp", 80);
+  Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);
 
-    //WiFiManager
-    //Local intialization. Once its business is done, there is no need to keep it around
-    WiFiManager wifiManager;
-    String APName;
+  ThingSpeak.begin( client );
 
-    //set config save notify callback
-    wifiManager.setSaveConfigCallback(saveConfigCallback);
+  // microgear.useTLS(true);
+  // microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
+  // microgear.connect(APPID);
 
-    wifiManager.addParameter(&custom_t_setpoint);
-    wifiManager.addParameter(&custom_t_range);
-    wifiManager.addParameter(&custom_h_setpoint);
-    wifiManager.addParameter(&custom_h_range);
-    wifiManager.addParameter(&custom_c_options);
-    wifiManager.addParameter(&custom_c_cool);
-    wifiManager.addParameter(&custom_c_moisture);
-    wifiManager.addParameter(&custom_c_writeapikey);
-    wifiManager.addParameter(&custom_c_readapikey);
-    wifiManager.addParameter(&custom_c_channelid);
-    wifiManager.addParameter(&custom_c_auth);
+  Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
+  boolean result = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+  Serial.print("Blynk connect : ");
+  Serial.println(result);
+  if(!Blynk.connected()) {
+    Serial.println("Not connected to Blynk server");
+    Blynk.connect(3333);  // try to connect to server with default timeout
+  }
+  else {
+    Serial.println("Connected to Blynk server");
+  }
 
+  // Setup a function to be called every second
+  gauge1Push_reset = blynktimer.setInterval(15000L, sendSensorT);
+  gauge2Push_reset = blynktimer.setInterval(15000L, sendSensorH);
+  // ตั้งการส่งให้เหลื่อมกัน 150ms
+  blynktimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
+  blynktimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
 
+  // statustimer.setInterval(5000L, sendStatus);
 
-    //reset saved settings
-    //wifiManager.resetSettings();
+  digitalWrite(LED, HIGH);
+  delay(500);
+  digitalWrite(LED, LOW);
+  buzzer_sound();
 
-    //set custom ip for portal
-    //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+  timer_readsensor.every(5000, temp_humi_sensor);
+  checkConnectionTimer.setInterval(2000L, reconnectBlynk);
+  checkFirmware.every(86400000L, upintheair);
+  upintheair();
 
-    //fetches ssid and pass from eeprom and tries to connect
-    //if it does not connect it starts an access point with the specified name
-    //here  "AutoConnectAP"
-    //and goes into a blocking loop awaiting configuration
-    //wifiManager.autoConnect("OgoSense");
-    //or use this for auto generated name ESP + ChipID
-    //wifiManager.autoConnect();
-
-    wifiManager.setTimeout(300);
-    APName = "OgoSense-"+String(ESP.getChipId());
-    if(!wifiManager.autoConnect(APName.c_str()) ) {
-      Serial.println("failed to connect and hit timeout");
-      delay(3000);
-      //reset and try again, or maybe put it to deep sleep
-      ESP.reset();
-      delay(5000);
-    }
-
-
-    //if you get here you have connected to the WiFi
-    Serial.println("connected...yeey :)");
-
-    ALIAS = "OgoSense-"+String(ESP.getChipId());
-    Serial.print(me);
-    Serial.print("\t");
-    Serial.print(ALIAS);
-    Serial.print("\t");
-    Serial.println(mystatus);
-
-    if (shouldSaveConfig) {
-      strcpy(t_setpoint, custom_t_setpoint.getValue());
-      strcpy(t_range, custom_t_range.getValue());
-      strcpy(h_setpoint, custom_h_setpoint.getValue());
-      strcpy(h_range, custom_h_range.getValue());
-      strcpy(c_options, custom_c_options.getValue());
-      strcpy(c_cool, custom_c_cool.getValue());
-      strcpy(c_moisture, custom_c_moisture.getValue());
-      strcpy(c_writeapikey, custom_c_writeapikey.getValue());
-      strcpy(c_readapikey, custom_c_readapikey.getValue());
-      strcpy(c_auth, custom_c_auth.getValue());
-      strcpy(c_channelid, custom_c_channelid.getValue());
-
-      temperature_setpoint = atol(t_setpoint);
-      temperature_range = atol(t_range);
-      humidity_setpoint = atol(h_setpoint);
-      humidity_range = atol(h_range);
-      options = atoi(c_options);
-      COOL = atoi(c_cool);
-      MOISTURE = atoi(c_moisture);
-      strcpy(writeAPIKey, c_writeapikey);
-      strcpy(readAPIKey, c_readapikey);
-      strcpy(auth, c_auth);
-      channelID = (unsigned long) atol(c_channelid);
-
-      Serial.print("Temperature : ");
-      Serial.println(t_setpoint);
-      Serial.print("Temperature Range : ");
-      Serial.println(t_range);
-      Serial.print("Humidity : ");
-      Serial.println(h_setpoint);
-      Serial.print("Humidity Range : ");
-      Serial.println(h_range);
-      Serial.print("Option : ");
-      Serial.println(c_options);
-      Serial.print("COOL : ");
-      Serial.println(COOL);
-      Serial.print("MOISTURE : ");
-      Serial.println(MOISTURE);
-      Serial.print("Write API Key : ");
-      Serial.println(writeAPIKey);
-      Serial.print("Read API Key : ");
-      Serial.println(readAPIKey);
-      Serial.print("Channel ID : ");
-      Serial.println(channelID);
-      Serial.print("auth token : ");
-      Serial.println(auth);
-
-      eeWriteInt(0, atoi(h_setpoint));
-      eeWriteInt(4, atoi(h_range));
-      eeWriteInt(8, atoi(t_setpoint));
-      eeWriteInt(12, atoi(t_range));
-      eeWriteInt(16, options);
-      eeWriteInt(20, COOL);
-      eeWriteInt(24, MOISTURE);
-      writeEEPROM(writeAPIKey, 28, 16);
-      writeEEPROM(readAPIKey, 44, 16);
-      writeEEPROM(auth, 60, 32);
-      EEPROMWritelong(92, (long) channelID);
-      eeWriteInt(500, 6550);
-    }
-
-
-    // web update OTA
-    String host_update_name;
-    host_update_name = "ogoswitch-"+String(ESP.getChipId());
-    MDNS.begin(host_update_name.c_str());
-    httpUpdater.setup(&httpServer, update_path, update_username, update_password);
-    httpServer.begin();
-    MDNS.addService("http", "tcp", 80);
-    Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);
-
-    ThingSpeak.begin( client );
-
-    // microgear.useTLS(true);
-    // microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
-    // microgear.connect(APPID);
-
-    Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
-    boolean result = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
-    Serial.print("Blynk connect : ");
-    Serial.println(result);
-    if(!Blynk.connected()){
-      Serial.println("Not connected to Blynk server");
-      Blynk.connect(3333);  // try to connect to server with default timeout
-    }
-    else {
-      Serial.println("Connected to Blynk server");
-    }
-
-    // Setup a function to be called every second
-    blynktimer.setInterval(15000L, sendSensor);
-    // statustimer.setInterval(5000L, sendStatus);
-
-    digitalWrite(LED, HIGH);
-    delay(500);
-    digitalWrite(LED, LOW);
-    buzzer_sound();
-
-    timer_readsensor.every(5000, temp_humi_sensor);
-    checkConnectionTimer.setInterval(2000L, reconnectBlynk);
-    checkFirmware.every(86400000L, upintheair);
-    upintheair();
-    // Blynk.setProperty(V1, "color", "#D3435C");
 }
 
 void loop() {
@@ -490,6 +502,36 @@ void loop() {
   statustimer.run();
   checkConnectionTimer.run();
 
+}
+
+void ondemand_wifi_setup()
+{
+  WiFiManager wifiManager;
+  String APName;
+
+  wifiManager.setTimeout(300);
+  APName = "OgoSense-"+String(ESP.getChipId());
+  Serial.println("On demand AP");
+  if (!wifiManager.startConfigPortal(APName.c_str())) {
+    Serial.println("failed to connect and hit timeout");
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
+
+  //if you get here you have connected to the WiFi
+  Serial.println("connected...yeey :)");
+}
+
+void OnceOnlyTask1()
+{
+  blynktimer.restartTimer(gauge1Push_reset);
+}
+
+void OnceOnlyTask2()
+{
+  blynktimer.restartTimer(gauge2Push_reset);
 }
 
 void temp_humi_sensor()
@@ -1198,24 +1240,31 @@ BLYNK_CONNECTED()
 // This function sends Arduino's up time every second to Virtual Pin (5).
 // In the app, Widget's reading frequency should be set to PUSH. This means
 // that you define how often to send data to Blynk App.
-void sendSensor()
+void sendSensorT()
 {
-  float h = sht30.humidity;
   float t = sht30.cTemp;
   char str[5] = "";
 
-  if (isnan(h) || isnan(t)) {
+  if (isnan(t)) {
     Serial.println("Failed to read from sensor!");
     return;
   }
   dtostrf(t, 4, 1, str);
   // You can send any value at any time.
   // Please don't send more that 10 values per second.
-
   Blynk.virtualWrite(V5, str);
+
+}
+
+void sendSensorH()
+{
+  float h = sht30.humidity;
+
+  if (isnan(h)) {
+    Serial.println("Failed to read from sensor!");
+    return;
+  }
   Blynk.virtualWrite(V6, (int) h);
-  Blynk.virtualWrite(V7, str);
-  Blynk.virtualWrite(V8, (int) h);
 }
 
 void sendStatus()
