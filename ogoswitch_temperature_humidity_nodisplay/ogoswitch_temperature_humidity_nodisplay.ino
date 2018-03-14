@@ -177,6 +177,10 @@ const int MAXRETRY=4; // 0 - 4
 
 void setup()
 {
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wifiManager;
+  String APName;
 
   Serial.begin(115200);
   Serial.println();
@@ -200,39 +204,7 @@ void setup()
   microgear.setEEPROMOffset(116);
 
 
-  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
-  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
-  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
-  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
-  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
-  WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
-  WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
-  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
-  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
-  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
-  WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
-
-
-
-  //WiFiManager
-  //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wifiManager;
-  String APName;
-
-  //set config save notify callback
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
-
-  wifiManager.addParameter(&custom_t_setpoint);
-  wifiManager.addParameter(&custom_t_range);
-  wifiManager.addParameter(&custom_h_setpoint);
-  wifiManager.addParameter(&custom_h_range);
-  wifiManager.addParameter(&custom_c_options);
-  wifiManager.addParameter(&custom_c_cool);
-  wifiManager.addParameter(&custom_c_moisture);
-  wifiManager.addParameter(&custom_c_writeapikey);
-  wifiManager.addParameter(&custom_c_readapikey);
-  wifiManager.addParameter(&custom_c_channelid);
-  wifiManager.addParameter(&custom_c_auth);
+  
 
 
 
@@ -263,35 +235,62 @@ void setup()
     strcpy(c_readapikey, readAPIKey);
     strcpy(c_auth, auth);
     ltoa(channelID, c_channelid, 10);
-
-    //reset saved settings
-    //wifiManager.resetSettings();
-
-    //set custom ip for portal
-    //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
-
-    //fetches ssid and pass from eeprom and tries to connect
-    //if it does not connect it starts an access point with the specified name
-    //here  "AutoConnectAP"
-    //and goes into a blocking loop awaiting configuration
-    //wifiManager.autoConnect("OgoSense");
-    //or use this for auto generated name ESP + ChipID
-    //wifiManager.autoConnect();
-
-    wifiManager.setTimeout(300);
-    APName = "OgoSense-"+String(ESP.getChipId());
-    if(!wifiManager.autoConnect(APName.c_str()) ) {
-      Serial.println("failed to connect and hit timeout");
-      delay(3000);
-      //reset and try again, or maybe put it to deep sleep
-      ESP.reset();
-      delay(5000);
-    }
   }
   else {
     ondemand_wifi_setup();
   }
 
+  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
+  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
+  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
+  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
+  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
+  WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
+  WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
+  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
+  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
+  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
+  WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
+  
+
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  wifiManager.addParameter(&custom_t_setpoint);
+  wifiManager.addParameter(&custom_t_range);
+  wifiManager.addParameter(&custom_h_setpoint);
+  wifiManager.addParameter(&custom_h_range);
+  wifiManager.addParameter(&custom_c_options);
+  wifiManager.addParameter(&custom_c_cool);
+  wifiManager.addParameter(&custom_c_moisture);
+  wifiManager.addParameter(&custom_c_writeapikey);
+  wifiManager.addParameter(&custom_c_readapikey);
+  wifiManager.addParameter(&custom_c_channelid);
+  wifiManager.addParameter(&custom_c_auth);
+
+  //reset saved settings
+  //wifiManager.resetSettings();
+
+  //set custom ip for portal
+  //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+
+  //fetches ssid and pass from eeprom and tries to connect
+  //if it does not connect it starts an access point with the specified name
+  //here  "AutoConnectAP"
+  //and goes into a blocking loop awaiting configuration
+  //wifiManager.autoConnect("OgoSense");
+  //or use this for auto generated name ESP + ChipID
+  //wifiManager.autoConnect();
+
+  wifiManager.setTimeout(300);
+  APName = "ogoSense-"+String(ESP.getChipId());
+  if(!wifiManager.autoConnect(APName.c_str()) ) {
+    Serial.println("failed to connect and hit timeout");
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
 
@@ -508,6 +507,34 @@ void ondemand_wifi_setup()
 {
   WiFiManager wifiManager;
   String APName;
+  
+  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
+  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
+  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
+  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
+  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
+  WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
+  WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
+  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
+  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
+  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
+  WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
+  
+
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  wifiManager.addParameter(&custom_t_setpoint);
+  wifiManager.addParameter(&custom_t_range);
+  wifiManager.addParameter(&custom_h_setpoint);
+  wifiManager.addParameter(&custom_h_range);
+  wifiManager.addParameter(&custom_c_options);
+  wifiManager.addParameter(&custom_c_cool);
+  wifiManager.addParameter(&custom_c_moisture);
+  wifiManager.addParameter(&custom_c_writeapikey);
+  wifiManager.addParameter(&custom_c_readapikey);
+  wifiManager.addParameter(&custom_c_channelid);
+  wifiManager.addParameter(&custom_c_auth);
 
   wifiManager.setTimeout(300);
   APName = "OgoSense-"+String(ESP.getChipId());
