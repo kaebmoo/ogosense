@@ -67,9 +67,9 @@ String firmware_name = "ogoswitch_th_minimal_blynk.ino.ino.d1_mini"; // ogoswitc
 #define KEY     "sYZknE19LHxr1zJ"           // key from netpie
 #define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
 
-String ALIAS = "OgoSense0000";              // alias name netpie
-char *me = "/nid/0000000";                  // topic set for sensor box
-char *mystatus = "/nid/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
+String ALIAS = "ogosense-0000";              // alias name netpie
+char *me = "/ogosense/0000000";                  // topic set for sensor box
+char *mystatus = "/ogosense/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
@@ -136,8 +136,8 @@ char c_channelid[8] = "";       // channel id thingspeak
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 int SAVE = 6550;      // Configuration save : if 6550 = saved
-int COOL = 1;        // true > set point, false < set point = HEAT mode
-int MOISTURE = 0;   // true < set point; false > set point
+int COOL = 1;        // true > set point Cool mode, false < set point = HEAT mode
+int MOISTURE = 0;   // true < set point moisture mode ; false > set point Dehumidifier mode
 boolean tempon = false;     // flag ON/OFF
 boolean humion = false;     // flag ON/OFF
 boolean AUTO = true;       // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
@@ -494,6 +494,27 @@ void loop() {
   checkConnectionTimer.run();
 
 }
+
+void ondemand_wifi_setup()
+{
+  WiFiManager wifiManager;
+  String APName;
+
+  wifiManager.setTimeout(300);
+  APName = "OgoSense-"+String(ESP.getChipId());
+  Serial.println("On demand AP");
+  if (!wifiManager.startConfigPortal(APName.c_str())) {
+    Serial.println("failed to connect and hit timeout");
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
+
+  //if you get here you have connected to the WiFi
+  Serial.println("connected...yeey :)");
+}
+
 
 void temp_humi_sensor()
 {
