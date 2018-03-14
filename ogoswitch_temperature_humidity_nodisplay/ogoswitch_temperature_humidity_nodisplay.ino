@@ -462,7 +462,7 @@ void setup()
   buzzer_sound();
 
   timer_readsensor.every(5000, temp_humi_sensor);
-  checkConnectionTimer.setInterval(2000L, reconnectBlynk);
+  checkConnectionTimer.setInterval(5000L, reconnectBlynk);
   checkFirmware.every(86400000L, upintheair);
   upintheair();
 
@@ -1307,6 +1307,7 @@ void sendStatus()
 }
 
 void reconnectBlynk() {
+  Serial.println("Check Blynk connection.");
   if (!Blynk.connected()) {
     if(Blynk.connect()) {
       BLYNK_LOG("Blynk Reconnected");
