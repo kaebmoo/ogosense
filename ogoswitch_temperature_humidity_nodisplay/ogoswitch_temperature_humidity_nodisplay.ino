@@ -52,6 +52,8 @@ SOFTWARE.
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
+#include "ogoswitch.h"
+
 const char* host = "ogosense-webupdate";
 const char* update_path = "/firmware";
 const char* update_username = "admin";
@@ -111,16 +113,16 @@ const int LED = D4;                         // output for LED (toggle) buildin L
 TM1637Display display(CLK, DIO); //set up the 4-Digit Display.
 SHT3X sht30(0x45);                          // address sensor
 
-float maxtemp = 30.0;
-float mintemp = 26.0;
-float maxhumidity = 70.0;
-float minhumidity = 40.0;
+float maxtemp = TEMPERATURE_SETPOINT;
+float mintemp = TEMPERATURE_SETPOINT - TEMPERATURE_RANGE;
+float maxhumidity = HUMIDITY_SETPOINT;
+float minhumidity = HUMIDITY_SETPOINT - HUMIDITY_RANGE;
 
-float temperature_setpoint = 30.0;  // 30.0 set point
-float temperature_range = 4.0;      // +- 4.0 from set point
+float temperature_setpoint = TEMPERATURE_SETPOINT;  // 30.0 set point
+float temperature_range = TEMPERATURE_RANGE;      // +- 4.0 from set point
 
-float humidity_setpoint = 70.0;     // 60 set point RH %
-float humidity_range = 20;          // +- 20 from set point
+float humidity_setpoint = HUMIDITY_SETPOINT;     // 60 set point RH %
+float humidity_range = HUMIDITY_RANGE;          // +- 20 from set point
 
 // set for wifimanager to get value from user
 char t_setpoint[6] = "30";
@@ -204,7 +206,7 @@ void setup()
   microgear.setEEPROMOffset(116);
 
 
-  
+
 
 
 
@@ -235,190 +237,12 @@ void setup()
     strcpy(c_readapikey, readAPIKey);
     strcpy(c_auth, auth);
     ltoa(channelID, c_channelid, 10);
+
+    auto_wifi_connect();
   }
   else {
     ondemand_wifi_setup();
   }
-
-  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
-  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
-  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
-  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
-  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
-  WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
-  WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
-  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
-  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
-  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
-  WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
-  
-
-  //set config save notify callback
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
-
-  wifiManager.addParameter(&custom_t_setpoint);
-  wifiManager.addParameter(&custom_t_range);
-  wifiManager.addParameter(&custom_h_setpoint);
-  wifiManager.addParameter(&custom_h_range);
-  wifiManager.addParameter(&custom_c_options);
-  wifiManager.addParameter(&custom_c_cool);
-  wifiManager.addParameter(&custom_c_moisture);
-  wifiManager.addParameter(&custom_c_writeapikey);
-  wifiManager.addParameter(&custom_c_readapikey);
-  wifiManager.addParameter(&custom_c_channelid);
-  wifiManager.addParameter(&custom_c_auth);
-
-  //reset saved settings
-  //wifiManager.resetSettings();
-
-  //set custom ip for portal
-  //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
-
-  //fetches ssid and pass from eeprom and tries to connect
-  //if it does not connect it starts an access point with the specified name
-  //here  "AutoConnectAP"
-  //and goes into a blocking loop awaiting configuration
-  //wifiManager.autoConnect("OgoSense");
-  //or use this for auto generated name ESP + ChipID
-  //wifiManager.autoConnect();
-
-  wifiManager.setTimeout(300);
-  APName = "ogoSense-"+String(ESP.getChipId());
-  if(!wifiManager.autoConnect(APName.c_str()) ) {
-    Serial.println("failed to connect and hit timeout");
-    delay(3000);
-    //reset and try again, or maybe put it to deep sleep
-    ESP.reset();
-    delay(5000);
-  }
-  //if you get here you have connected to the WiFi
-  Serial.println("connected...yeey :)");
-
-
-  Serial.println();
-  Serial.print("Temperature : ");
-  Serial.println(temperature_setpoint);
-  Serial.print("Temperature Range : ");
-  Serial.println(temperature_range);
-  Serial.print("Humidity : ");
-  Serial.println(humidity_setpoint);
-  Serial.print("Humidity Range : ");
-  Serial.println(humidity_range);
-  Serial.print("Option : ");
-  Serial.println(options);
-  Serial.print("COOL : ");
-  Serial.println(COOL);
-  Serial.print("MOISTURE : ");
-  Serial.println(MOISTURE);
-  Serial.print("Write API Key : ");
-  Serial.println(writeAPIKey);
-  Serial.print("Read API Key : ");
-  Serial.println(readAPIKey);
-  Serial.print("Channel ID : ");
-  Serial.println(channelID);
-  Serial.print("auth token : ");
-  Serial.println(auth);
-
-
-  if (temperature_setpoint > 100 || temperature_setpoint < 0) {
-    temperature_setpoint = 30;
-    shouldSaveConfig = true;
-  }
-  if (temperature_range > 100 || temperature_range < 0) {
-    temperature_range = 2;
-    shouldSaveConfig = true;
-  }
-  if (humidity_setpoint > 100 || humidity_setpoint < 0) {
-    humidity_setpoint = 60;
-    shouldSaveConfig = true;
-  }
-  if (humidity_range > 100 || humidity_range < 0) {
-    humidity_range = 5;
-    shouldSaveConfig = true;
-  }
-  if (options > 2 || options < 0) {
-    options = 1;
-    shouldSaveConfig = true;
-  }
-  if (COOL > 1 || COOL < 0) {
-    COOL = 1;
-    shouldSaveConfig = true;
-  }
-  if (MOISTURE > 1 || MOISTURE < 0) {
-    MOISTURE = 0;
-    shouldSaveConfig = true;
-  }
-
-
-  ALIAS = "ogosense-"+String(ESP.getChipId());
-  Serial.print(me);
-  Serial.print("\t");
-  Serial.print(ALIAS);
-  Serial.print("\t");
-  Serial.println(mystatus);
-
-  if (shouldSaveConfig) {
-    strcpy(t_setpoint, custom_t_setpoint.getValue());
-    strcpy(t_range, custom_t_range.getValue());
-    strcpy(h_setpoint, custom_h_setpoint.getValue());
-    strcpy(h_range, custom_h_range.getValue());
-    strcpy(c_options, custom_c_options.getValue());
-    strcpy(c_cool, custom_c_cool.getValue());
-    strcpy(c_moisture, custom_c_moisture.getValue());
-    strcpy(c_writeapikey, custom_c_writeapikey.getValue());
-    strcpy(c_readapikey, custom_c_readapikey.getValue());
-    strcpy(c_auth, custom_c_auth.getValue());
-    strcpy(c_channelid, custom_c_channelid.getValue());
-
-    temperature_setpoint = atol(t_setpoint);
-    temperature_range = atol(t_range);
-    humidity_setpoint = atol(h_setpoint);
-    humidity_range = atol(h_range);
-    options = atoi(c_options);
-    COOL = atoi(c_cool);
-    MOISTURE = atoi(c_moisture);
-    strcpy(writeAPIKey, c_writeapikey);
-    strcpy(readAPIKey, c_readapikey);
-    strcpy(auth, c_auth);
-    channelID = (unsigned long) atol(c_channelid);
-
-    Serial.print("Temperature : ");
-    Serial.println(t_setpoint);
-    Serial.print("Temperature Range : ");
-    Serial.println(t_range);
-    Serial.print("Humidity : ");
-    Serial.println(h_setpoint);
-    Serial.print("Humidity Range : ");
-    Serial.println(h_range);
-    Serial.print("Option : ");
-    Serial.println(c_options);
-    Serial.print("COOL : ");
-    Serial.println(COOL);
-    Serial.print("MOISTURE : ");
-    Serial.println(MOISTURE);
-    Serial.print("Write API Key : ");
-    Serial.println(writeAPIKey);
-    Serial.print("Read API Key : ");
-    Serial.println(readAPIKey);
-    Serial.print("Channel ID : ");
-    Serial.println(channelID);
-    Serial.print("auth token : ");
-    Serial.println(auth);
-
-    eeWriteInt(0, atoi(h_setpoint));
-    eeWriteInt(4, atoi(h_range));
-    eeWriteInt(8, atoi(t_setpoint));
-    eeWriteInt(12, atoi(t_range));
-    eeWriteInt(16, options);
-    eeWriteInt(20, COOL);
-    eeWriteInt(24, MOISTURE);
-    writeEEPROM(writeAPIKey, 28, 16);
-    writeEEPROM(readAPIKey, 44, 16);
-    writeEEPROM(auth, 60, 32);
-    EEPROMWritelong(92, (long) channelID);
-    eeWriteInt(500, 6550);
-  }
-
 
   // web update OTA
   String host_update_name;
@@ -503,11 +327,11 @@ void loop() {
 
 }
 
-void ondemand_wifi_setup()
+void auto_wifi_connect()
 {
   WiFiManager wifiManager;
   String APName;
-  
+
   WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
   WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
   WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
@@ -519,7 +343,191 @@ void ondemand_wifi_setup()
   WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
   WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
   WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
-  
+
+
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  wifiManager.addParameter(&custom_t_setpoint);
+  wifiManager.addParameter(&custom_t_range);
+  wifiManager.addParameter(&custom_h_setpoint);
+  wifiManager.addParameter(&custom_h_range);
+  wifiManager.addParameter(&custom_c_options);
+  wifiManager.addParameter(&custom_c_cool);
+  wifiManager.addParameter(&custom_c_moisture);
+  wifiManager.addParameter(&custom_c_writeapikey);
+  wifiManager.addParameter(&custom_c_readapikey);
+  wifiManager.addParameter(&custom_c_channelid);
+  wifiManager.addParameter(&custom_c_auth);
+
+  //reset saved settings
+  //wifiManager.resetSettings();
+
+  //set custom ip for portal
+  //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+
+  //fetches ssid and pass from eeprom and tries to connect
+  //if it does not connect it starts an access point with the specified name
+  //here  "AutoConnectAP"
+  //and goes into a blocking loop awaiting configuration
+  //wifiManager.autoConnect("OgoSense");
+  //or use this for auto generated name ESP + ChipID
+  //wifiManager.autoConnect();
+
+  wifiManager.setTimeout(300);
+  APName = "ogoSense-"+String(ESP.getChipId());
+  if(!wifiManager.autoConnect(APName.c_str()) ) {
+    Serial.println("failed to connect and hit timeout");
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
+  //if you get here you have connected to the WiFi
+  Serial.println("connected...yeey :)");
+
+  if (temperature_setpoint > 100 || temperature_setpoint < 0) {
+    temperature_setpoint = TEMPERATURE_SETPOINT;
+    shouldSaveConfig = true;
+  }
+  if (temperature_range > 100 || temperature_range < 0) {
+    temperature_range = TEMPERATURE_RANGE;
+    shouldSaveConfig = true;
+  }
+  if (humidity_setpoint > 100 || humidity_setpoint < 0) {
+    humidity_setpoint = HUMIDITY_SETPOINT;
+    shouldSaveConfig = true;
+  }
+  if (humidity_range > 100 || humidity_range < 0) {
+    humidity_range = HUMIDITY_RANGE;
+    shouldSaveConfig = true;
+  }
+  if (options > 2 || options < 0) {
+    options = OPTIONS;
+    shouldSaveConfig = true;
+  }
+  if (COOL > 1 || COOL < 0) {
+    COOL = COOL_MODE;
+    shouldSaveConfig = true;
+  }
+  if (MOISTURE > 1 || MOISTURE < 0) {
+    MOISTURE = MOISTURE_MODE;
+    shouldSaveConfig = true;
+  }
+
+  Serial.println();
+  Serial.print("Temperature : ");
+  Serial.println(temperature_setpoint);
+  Serial.print("Temperature Range : ");
+  Serial.println(temperature_range);
+  Serial.print("Humidity : ");
+  Serial.println(humidity_setpoint);
+  Serial.print("Humidity Range : ");
+  Serial.println(humidity_range);
+  Serial.print("Option : ");
+  Serial.println(options);
+  Serial.print("COOL : ");
+  Serial.println(COOL);
+  Serial.print("MOISTURE : ");
+  Serial.println(MOISTURE);
+  Serial.print("Write API Key : ");
+  Serial.println(writeAPIKey);
+  Serial.print("Read API Key : ");
+  Serial.println(readAPIKey);
+  Serial.print("Channel ID : ");
+  Serial.println(channelID);
+  Serial.print("auth token : ");
+  Serial.println(auth);
+
+  ALIAS = "ogosense-"+String(ESP.getChipId());
+  Serial.print(me);
+  Serial.print("\t");
+  Serial.print(ALIAS);
+  Serial.print("\t");
+  Serial.println(mystatus);
+
+  if (shouldSaveConfig) {
+    Serial.println("Saving config...");
+    strcpy(t_setpoint, custom_t_setpoint.getValue());
+    strcpy(t_range, custom_t_range.getValue());
+    strcpy(h_setpoint, custom_h_setpoint.getValue());
+    strcpy(h_range, custom_h_range.getValue());
+    strcpy(c_options, custom_c_options.getValue());
+    strcpy(c_cool, custom_c_cool.getValue());
+    strcpy(c_moisture, custom_c_moisture.getValue());
+    strcpy(c_writeapikey, custom_c_writeapikey.getValue());
+    strcpy(c_readapikey, custom_c_readapikey.getValue());
+    strcpy(c_auth, custom_c_auth.getValue());
+    strcpy(c_channelid, custom_c_channelid.getValue());
+
+    temperature_setpoint = atol(t_setpoint);
+    temperature_range = atol(t_range);
+    humidity_setpoint = atol(h_setpoint);
+    humidity_range = atol(h_range);
+    options = atoi(c_options);
+    COOL = atoi(c_cool);
+    MOISTURE = atoi(c_moisture);
+    strcpy(writeAPIKey, c_writeapikey);
+    strcpy(readAPIKey, c_readapikey);
+    strcpy(auth, c_auth);
+    channelID = (unsigned long) atol(c_channelid);
+
+    Serial.print("Temperature : ");
+    Serial.println(t_setpoint);
+    Serial.print("Temperature Range : ");
+    Serial.println(t_range);
+    Serial.print("Humidity : ");
+    Serial.println(h_setpoint);
+    Serial.print("Humidity Range : ");
+    Serial.println(h_range);
+    Serial.print("Option : ");
+    Serial.println(c_options);
+    Serial.print("COOL : ");
+    Serial.println(COOL);
+    Serial.print("MOISTURE : ");
+    Serial.println(MOISTURE);
+    Serial.print("Write API Key : ");
+    Serial.println(writeAPIKey);
+    Serial.print("Read API Key : ");
+    Serial.println(readAPIKey);
+    Serial.print("Channel ID : ");
+    Serial.println(channelID);
+    Serial.print("auth token : ");
+    Serial.println(auth);
+
+    eeWriteInt(0, atoi(h_setpoint));
+    eeWriteInt(4, atoi(h_range));
+    eeWriteInt(8, atoi(t_setpoint));
+    eeWriteInt(12, atoi(t_range));
+    eeWriteInt(16, options);
+    eeWriteInt(20, COOL);
+    eeWriteInt(24, MOISTURE);
+    writeEEPROM(writeAPIKey, 28, 16);
+    writeEEPROM(readAPIKey, 44, 16);
+    writeEEPROM(auth, 60, 32);
+    EEPROMWritelong(92, (long) channelID);
+    eeWriteInt(500, 6550);
+    shouldSaveConfig = false;
+  }
+}
+
+void ondemand_wifi_setup()
+{
+  WiFiManager wifiManager;
+  String APName;
+
+  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
+  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
+  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
+  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
+  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
+  WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
+  WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
+  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
+  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
+  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
+  WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
+
 
   //set config save notify callback
   wifiManager.setSaveConfigCallback(saveConfigCallback);
@@ -549,6 +557,98 @@ void ondemand_wifi_setup()
 
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
+  if (temperature_setpoint > 100 || temperature_setpoint < 0) {
+    temperature_setpoint = 30;
+    shouldSaveConfig = true;
+  }
+  if (temperature_range > 100 || temperature_range < 0) {
+    temperature_range = 2;
+    shouldSaveConfig = true;
+  }
+  if (humidity_setpoint > 100 || humidity_setpoint < 0) {
+    humidity_setpoint = 60;
+    shouldSaveConfig = true;
+  }
+  if (humidity_range > 100 || humidity_range < 0) {
+    humidity_range = 5;
+    shouldSaveConfig = true;
+  }
+  if (options > 2 || options < 0) {
+    options = 1;
+    shouldSaveConfig = true;
+  }
+  if (COOL > 1 || COOL < 0) {
+    COOL = 1;
+    shouldSaveConfig = true;
+  }
+  if (MOISTURE > 1 || MOISTURE < 0) {
+    MOISTURE = 0;
+    shouldSaveConfig = true;
+  }
+
+  if (shouldSaveConfig) {
+    Serial.println("Saving config...");
+    strcpy(t_setpoint, custom_t_setpoint.getValue());
+    strcpy(t_range, custom_t_range.getValue());
+    strcpy(h_setpoint, custom_h_setpoint.getValue());
+    strcpy(h_range, custom_h_range.getValue());
+    strcpy(c_options, custom_c_options.getValue());
+    strcpy(c_cool, custom_c_cool.getValue());
+    strcpy(c_moisture, custom_c_moisture.getValue());
+    strcpy(c_writeapikey, custom_c_writeapikey.getValue());
+    strcpy(c_readapikey, custom_c_readapikey.getValue());
+    strcpy(c_auth, custom_c_auth.getValue());
+    strcpy(c_channelid, custom_c_channelid.getValue());
+
+    temperature_setpoint = atol(t_setpoint);
+    temperature_range = atol(t_range);
+    humidity_setpoint = atol(h_setpoint);
+    humidity_range = atol(h_range);
+    options = atoi(c_options);
+    COOL = atoi(c_cool);
+    MOISTURE = atoi(c_moisture);
+    strcpy(writeAPIKey, c_writeapikey);
+    strcpy(readAPIKey, c_readapikey);
+    strcpy(auth, c_auth);
+    channelID = (unsigned long) atol(c_channelid);
+
+    Serial.print("Temperature : ");
+    Serial.println(t_setpoint);
+    Serial.print("Temperature Range : ");
+    Serial.println(t_range);
+    Serial.print("Humidity : ");
+    Serial.println(h_setpoint);
+    Serial.print("Humidity Range : ");
+    Serial.println(h_range);
+    Serial.print("Option : ");
+    Serial.println(c_options);
+    Serial.print("COOL : ");
+    Serial.println(COOL);
+    Serial.print("MOISTURE : ");
+    Serial.println(MOISTURE);
+    Serial.print("Write API Key : ");
+    Serial.println(writeAPIKey);
+    Serial.print("Read API Key : ");
+    Serial.println(readAPIKey);
+    Serial.print("Channel ID : ");
+    Serial.println(channelID);
+    Serial.print("auth token : ");
+    Serial.println(auth);
+
+    eeWriteInt(0, atoi(h_setpoint));
+    eeWriteInt(4, atoi(h_range));
+    eeWriteInt(8, atoi(t_setpoint));
+    eeWriteInt(12, atoi(t_range));
+    eeWriteInt(16, options);
+    eeWriteInt(20, COOL);
+    eeWriteInt(24, MOISTURE);
+    writeEEPROM(writeAPIKey, 28, 16);
+    writeEEPROM(readAPIKey, 44, 16);
+    writeEEPROM(auth, 60, 32);
+    EEPROMWritelong(92, (long) channelID);
+    eeWriteInt(500, 6550);
+    shouldSaveConfig = false;
+  }
 }
 
 void OnceOnlyTask1()
