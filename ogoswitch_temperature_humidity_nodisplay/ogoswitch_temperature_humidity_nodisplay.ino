@@ -286,7 +286,7 @@ void setup()
   buzzer_sound();
 
   timer_readsensor.every(5000, temp_humi_sensor);
-  checkConnectionTimer.setInterval(5000L, reconnectBlynk);
+  checkConnectionTimer.setInterval(300000L, reconnectBlynk);
   checkFirmware.every(86400000L, upintheair);
   upintheair();
 
@@ -320,7 +320,9 @@ void loop() {
   timer_readsensor.update();
   checkFirmware.update();
 
-  Blynk.run();
+  if (Blynk.connected()) {
+    Blynk.run();
+  }
   blynktimer.run();
   statustimer.run();
   checkConnectionTimer.run();
