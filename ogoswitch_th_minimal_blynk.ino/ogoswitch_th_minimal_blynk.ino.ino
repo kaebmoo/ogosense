@@ -58,7 +58,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 4;
+const int FW_VERSION = 5; //20180323
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 String firmware_name = "ogoswitch_th_minimal_blynk.ino.ino.d1_mini"; // ogoswitch_th_minimal_blynk.ino.ino.d1_mini
 
@@ -453,7 +453,7 @@ void setup() {
     buzzer_sound();
 
     timer_readsensor.every(5000, temp_humi_sensor);
-    checkConnectionTimer.setInterval(2000L, reconnectBlynk);
+    checkConnectionTimer.setInterval(300000L, reconnectBlynk);
     checkFirmware.every(86400000L, upintheair);
     upintheair();
 
@@ -488,7 +488,9 @@ void loop() {
   timer_readsensor.update();
   checkFirmware.update();
 
-  Blynk.run();
+  if (Blynk.connected()) {
+    Blynk.run();
+  }
   blynktimer.run();
   statustimer.run();
   checkConnectionTimer.run();

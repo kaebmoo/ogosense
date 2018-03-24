@@ -60,7 +60,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 1;
+const int FW_VERSION = 2;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
 
@@ -200,10 +200,12 @@ void setup()
 
   // put your setup code here, to run once:
 
+  #ifdef NETPIE
   /* setup netpie call back */
   microgear.on(MESSAGE,onMsghandler);
   microgear.on(CONNECTED,onConnected);
   microgear.setEEPROMOffset(116);
+  #endif
 
 
 
@@ -256,8 +258,10 @@ void setup()
   ThingSpeak.begin( client );
 
   // microgear.useTLS(true);
-  // microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
-  // microgear.connect(APPID);
+  #ifdef NETPIE
+  microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
+  microgear.connect(APPID);
+  #endif
 
   Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
   boolean result = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
