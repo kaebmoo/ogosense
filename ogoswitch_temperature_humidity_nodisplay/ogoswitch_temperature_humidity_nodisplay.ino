@@ -278,9 +278,9 @@ void setup()
   // Setup a function to be called every second
   gauge1Push_reset = blynktimer.setInterval(15000L, sendSensorT);
   gauge2Push_reset = blynktimer.setInterval(15000L, sendSensorH);
-  // ตั้งการส่งให้เหลื่อมกัน 150ms
-  blynktimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
-  blynktimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
+  // ตั้งการส่งให้เหลื่อมกัน 500ms
+  blynktimer.setTimeout(500, OnceOnlyTask1); // Guage V5 temperature
+  blynktimer.setTimeout(1000, OnceOnlyTask2); // Guage v6 humidity
 
   // statustimer.setInterval(5000L, sendStatus);
 
@@ -1253,7 +1253,6 @@ BLYNK_WRITE(V2)
     Serial.print("AUTO Mode : ");
     Serial.println(AUTO);
   }
-
 }
 
 BLYNK_WRITE(V20)
@@ -1337,6 +1336,33 @@ BLYNK_WRITE(V27)
   humidity_range = stepperValue;
 }
 
+BLYNK_READ(V5)
+{
+  float t = sht30.cTemp;
+  char str[5] = "";
+
+  if (isnan(t)) {
+    Serial.println("Failed to read from sensor!");
+    return;
+  }
+  dtostrf(t, 4, 1, str);
+  // You can send any value at any time.
+  // Please don't send more that 10 values per second.
+  Blynk.virtualWrite(V5, str);
+
+}
+
+BLYNK_READ(V6)
+{
+  float h = sht30.humidity;
+
+  if (isnan(h)) {
+    Serial.println("Failed to read from sensor!");
+    return;
+  }
+  Blynk.virtualWrite(V6, (int) h);
+
+}
 
 BLYNK_CONNECTED()
 {
