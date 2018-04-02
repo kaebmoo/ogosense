@@ -60,7 +60,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 3;
+const int FW_VERSION = 4;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
 
@@ -276,12 +276,12 @@ void setup()
   }
 
   // Setup a function to be called every second
-  gauge1Push_reset = blynktimer.setInterval(300000L, sendSensorT);
-  gauge2Push_reset = blynktimer.setInterval(300000L, sendSensorH);
-  
+  // gauge1Push_reset = blynktimer.setInterval(300000L, sendSensorT);
+  // gauge2Push_reset = blynktimer.setInterval(300000L, sendSensorH);
+
   // ตั้งการส่งให้เหลื่อมกัน 150ms
-  blynktimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
-  blynktimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
+  // blynktimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
+  // blynktimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
 
   // statustimer.setInterval(5000L, sendStatus);
 
@@ -328,8 +328,9 @@ void loop() {
   if (Blynk.connected()) {
     Blynk.run();
   }
-  blynktimer.run();
-  statustimer.run();
+  // blynktimer.run();
+  // statustimer.run();
+
   checkConnectionTimer.run();
 
 }
