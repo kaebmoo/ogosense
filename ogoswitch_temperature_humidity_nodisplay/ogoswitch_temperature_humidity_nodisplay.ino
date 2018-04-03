@@ -23,8 +23,8 @@ SOFTWARE.
 */
 
 /* Comment this out to disable prints and save space */
-// #define BLYNK_DEBUG // Optional, this enables lots of prints
-// #define BLYNK_PRINT Serial
+//#define BLYNK_DEBUG // Optional, this enables lots of prints
+//#define BLYNK_PRINT Serial
 
 
 #include <SPI.h>
