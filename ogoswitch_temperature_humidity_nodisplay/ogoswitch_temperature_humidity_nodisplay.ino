@@ -60,7 +60,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 4;
+const int FW_VERSION = 5;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
 
@@ -169,6 +169,7 @@ int afterStart = -1;
 int afterStop = -1;
 
 bool send2thingspeak = false;
+bool blynkConnectedResult = false;
 
 const int MAXRETRY=4; // 0 - 4
 #define BLYNK_GREEN     "#23C48E"
@@ -264,11 +265,11 @@ void setup()
   #endif
 
   Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
-  boolean result = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+  blynkConnectedResult = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
   Serial.print("Blynk connect : ");
-  Serial.println(result);
+  Serial.println(blynkConnectedResult);
   if(!Blynk.connected()) {
-    Serial.println("Not connected to Blynk server");
+    Serial.println("Not connected to Blynk server, try to reconnect...");
     Blynk.connect(3333);  // try to connect to server with default timeout
   }
   else {
@@ -291,7 +292,7 @@ void setup()
   buzzer_sound();
 
   timer_readsensor.every(5000, temp_humi_sensor);
-  checkConnectionTimer.setInterval(300000L, reconnectBlynk);
+  checkConnectionTimer.setInterval(15000L, checkBlynkConnection);
   checkFirmware.every(86400000L, upintheair);
   upintheair();
 
@@ -1440,14 +1441,29 @@ void sendStatus()
     }
 }
 
-void reconnectBlynk() {
+void checkBlynkConnection() {
+  int mytimeout;
+
   Serial.println("Check Blynk connection.");
-  if (!Blynk.connected()) {
-    if(Blynk.connect()) {
-      BLYNK_LOG("Blynk Reconnected");
-    } else {
-      BLYNK_LOG("Blynk Not reconnected");
-    }
+  blynkConnectedResult = Blynk.connected();
+  if (!blynkConnectedResult) {
+    Serial.println("Blynk not connected");
+    Blynk.config(auth);
+    mytimeout = millis() / 1000;
+    Serial.println("Blynk trying to reconnect.");
+    while (!blynkConnectedResult) {      
+      blynkConnectedResult = Blynk.connect(3333);
+      if((millis() / 1000) > mytimeout + 3) { // try for less than 4 seconds
+        Serial.println("Blynk reconnect timeout.");
+        break;
+      }
+    }    
+  }
+  if (blynkConnectedResult) {
+      Serial.println("Blynk connected");
+  }
+  else {
+    Serial.println("Blynk not connected");
   }
 }
 
