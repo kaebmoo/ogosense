@@ -205,7 +205,7 @@ void setup()
   /* setup netpie call back */
   microgear.on(MESSAGE,onMsghandler);
   microgear.on(CONNECTED,onConnected);
-  microgear.setEEPROMOffset(116);
+  microgear.setEEPROMOffset(512);
   #endif
 
 
@@ -309,6 +309,7 @@ void loop() {
   /*
    * netpie connect
    *
+  #ifdef NETPIE
   if (microgear.connected()) {
     microgear.loop();
     Serial.println("publish to netpie");
@@ -318,6 +319,7 @@ void loop() {
     Serial.println("connection lost, reconnect...");
     microgear.connect(APPID);
   }
+  #endif 
   */
 
   t_relay.update();
@@ -1451,13 +1453,13 @@ void checkBlynkConnection() {
     Blynk.config(auth);
     mytimeout = millis() / 1000;
     Serial.println("Blynk trying to reconnect.");
-    while (!blynkConnectedResult) {      
+    while (!blynkConnectedResult) {
       blynkConnectedResult = Blynk.connect(3333);
       if((millis() / 1000) > mytimeout + 3) { // try for less than 4 seconds
         Serial.println("Blynk reconnect timeout.");
         break;
       }
-    }    
+    }
   }
   if (blynkConnectedResult) {
       Serial.println("Blynk connected");
