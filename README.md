@@ -37,3 +37,6 @@ smart sensor
 * สามารถควบคุมตั้งค่า สั่งเปิด ปิด ผ่าน mobile app ได้ทั้ง iOS และ Android ด้วย Blynk App
 * ตัวอย่างการใช้งานผ่าน ThingSpeak https://thingspeak.com/channels/360709
 
+
+
+วิธีใช้งานเบื้องต้น (การตั้งค่า blynk app, thingspeak channel) https://www.ogonan.com/ogosense/ 
