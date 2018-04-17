@@ -60,7 +60,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 5;
+const int FW_VERSION = 6;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
 
@@ -80,21 +80,15 @@ char *readAPIKey = "GNZ8WEU763Z5DUEA";
 char *writeAPIKey = "8M07EYX8NPCD9V8U";
 const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
 
-unsigned int dataFieldFour = 4;                            // Field to write temperature C data
-unsigned int dataFieldFive = 5;
-unsigned int dataFieldOne = 1;
-unsigned int dataFieldTwo = 2;                       // Field to write relative humidity data
-unsigned int dataFieldThree = 3;                     // Field to write temperature F data
-unsigned long lastConnectionTime = 0;
+
 long lastUpdateTime = 0;
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
 char auth[] = "27092c0fc50343bc917a97c755012c9b";
 
-WidgetLED led1(10); //virtual led
+WidgetLED led1(10); // On led
 WidgetLED led2(11); // Auto status
-WidgetLED led3(12); // Box status
 
 int gauge1Push_reset;
 int gauge2Push_reset;
@@ -162,14 +156,14 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 //flag for saving data
 bool shouldSaveConfig = false;
 
-BlynkTimer blynktimer, statustimer, checkConnectionTimer;
-Timer t_relay, t_delayStart, timer_delaysend, timer_readsensor, checkFirmware;         // timer for ON period and delay start
+BlynkTimer blynktimer, checkConnectionTimer;
+Timer t_relay, t_delayStart, timer_readsensor, checkFirmware;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
 
-bool send2thingspeak = false;
 bool blynkConnectedResult = false;
+int blynkreconnect = 0;
 
 const int MAXRETRY=4; // 0 - 4
 #define BLYNK_GREEN     "#23C48E"
@@ -182,8 +176,8 @@ void setup()
 {
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wifiManager;
-  String APName;
+  // WiFiManager wifiManager;
+  // String APName;
 
   Serial.begin(115200);
   Serial.println();
@@ -268,13 +262,13 @@ void setup()
   blynkConnectedResult = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
   Serial.print("Blynk connect : ");
   Serial.println(blynkConnectedResult);
-  if(!Blynk.connected()) {
-    Serial.println("Not connected to Blynk server, try to reconnect...");
-    Blynk.connect(3333);  // try to connect to server with default timeout
-  }
-  else {
+  if (blynkConnectedResult) {
     Serial.println("Connected to Blynk server");
   }
+  else {
+    Serial.println("Not connected to Blynk server");
+  }
+  
 
   // Setup a function to be called every second
   // gauge1Push_reset = blynktimer.setInterval(300000L, sendSensorT);
@@ -284,7 +278,7 @@ void setup()
   // blynktimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
   // blynktimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
 
-  // statustimer.setInterval(5000L, sendStatus);
+  
 
   digitalWrite(LED, HIGH);
   delay(500);
@@ -292,13 +286,15 @@ void setup()
   buzzer_sound();
 
   timer_readsensor.every(5000, temp_humi_sensor);
-  checkConnectionTimer.setInterval(15000L, checkBlynkConnection);
+  checkConnectionTimer.setInterval(300000L, checkBlynkConnection);
   checkFirmware.every(86400000L, upintheair);
   upintheair();
 
 }
 
 void loop() {
+
+  httpServer.handleClient();
 
   blink();
 
@@ -319,12 +315,12 @@ void loop() {
     Serial.println("connection lost, reconnect...");
     microgear.connect(APPID);
   }
-  #endif 
+  #endif
   */
 
   t_relay.update();
   t_delayStart.update();
-  timer_delaysend.update();
+
   timer_readsensor.update();
   checkFirmware.update();
 
@@ -332,7 +328,7 @@ void loop() {
     Blynk.run();
   }
   // blynktimer.run();
-  // statustimer.run();
+  
 
   checkConnectionTimer.run();
 
@@ -961,8 +957,10 @@ void turnrelay_onoff(uint8_t value)
 void turnoff()
 {
   afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
-  turnrelay_onoff(LOW);
-  Serial.println("Timer Stop: RELAY1 OFF");
+  if (standbyPeriod >= 5000) {
+    turnrelay_onoff(LOW);
+    Serial.println("Timer Stop: RELAY1 OFF");
+  }
   afterStart = -1;
 }
 
@@ -973,16 +971,6 @@ void delayStart()
   Serial.println("Timer Delay Start End.");
 }
 
-//use this function if you want multiple fields simultaneously
-int write2TSData( long TSChannel, unsigned int TSField1, float field1Data, unsigned int TSField2, float field2Data, unsigned int TSField3, float field3Data ){
-
-  ThingSpeak.setField( TSField1, field1Data );
-  ThingSpeak.setField( TSField2, field2Data );
-  ThingSpeak.setField( TSField3, field3Data );
-
-  int writeSuccess = ThingSpeak.writeFields( TSChannel, writeAPIKey );
-  return writeSuccess;
-}
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -1138,22 +1126,21 @@ void blink()
 }
 
 void sendThingSpeak()
-{
-  send2thingspeak = true;
-
-  if(sht30.get()==0) {
-    // Only update if posting time is exceeded
-    unsigned long currentMillis = millis();
-    if (currentMillis - lastUpdateTime >=  postingInterval) {
-      lastUpdateTime = currentMillis;
-
-      float fahrenheitTemperature, celsiusTemperature;
-      float rhHumidity;
-
+{   
+  float fahrenheitTemperature = 0;
+  float celsiusTemperature = 0;
+  float rhHumidity = 0; 
+  // Only update if posting time is exceeded
+  unsigned long currentMillis = millis();
+ 
+  if (currentMillis - lastUpdateTime >=  postingInterval) {
+    lastUpdateTime = currentMillis;
+       
+    if(sht30.get()==0) {
       fahrenheitTemperature = sht30.fTemp;
       celsiusTemperature = sht30.cTemp;
       rhHumidity = sht30.humidity;
-
+  
       Serial.print(celsiusTemperature);
       Serial.print(", ");
       Serial.print(fahrenheitTemperature);
@@ -1161,22 +1148,16 @@ void sendThingSpeak()
       Serial.print(rhHumidity);
       Serial.println();
       Serial.print("Sending data to ThingSpeak : ");
-
-      //ThingSpeak.writeField(channelID, dataFieldOne, celsiusTemperature, writeAPIKey);
-      //ThingSpeak.writeField(channelID, dataFieldTwo, rhHumidity, writeAPIKey);
-      //ThingSpeak.writeField(channelID, dataFieldThree, fahrenheitTemperature, writeAPIKey);
-      // write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
-
-      ThingSpeak.setField( 1, celsiusTemperature );
-      ThingSpeak.setField( 2, rhHumidity );
-      ThingSpeak.setField( 3, digitalRead(RELAY1));
-      int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
-      Serial.println(writeSuccess);
-      Serial.println();
     }
+      
+    ThingSpeak.setField( 1, celsiusTemperature );
+    ThingSpeak.setField( 2, rhHumidity );
+    ThingSpeak.setField( 3, digitalRead(RELAY1));
+    int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
+    Serial.println(writeSuccess);
+    Serial.println();
+    
   }
-
-
 }
 
 void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
@@ -1188,7 +1169,7 @@ void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
     /*
     if(strcmp(topic, me) == 0) {
       if ((char)msg[0] == '1') {
-        timer_delaysend.after(15 * 1000, sendThingSpeak());
+
       }
     }
     */
@@ -1431,17 +1412,6 @@ void sendSensorH()
   Blynk.virtualWrite(V6, (int) h);
 }
 
-void sendStatus()
-{
-  // if the LED is off turn it on and vice-versa:
-    if (ledStatus == LOW) {
-      ledStatus = HIGH;
-      led3.on();
-    } else {
-      ledStatus = LOW;
-      led3.off();
-    }
-}
 
 void checkBlynkConnection() {
   int mytimeout;
@@ -1466,6 +1436,13 @@ void checkBlynkConnection() {
   }
   else {
     Serial.println("Blynk not connected");
+    Serial.print("blynkreconnect: ");
+    Serial.println(blynkreconnect);
+    blynkreconnect++;
+    if (blynkreconnect >= 10) {
+      // delay(60000);
+      // ESP.reset();
+    }
   }
 }
 

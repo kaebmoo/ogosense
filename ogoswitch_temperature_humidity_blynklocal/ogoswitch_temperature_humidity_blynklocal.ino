@@ -80,21 +80,16 @@ char *readAPIKey = "GNZ8WEU763Z5DUEA";
 char *writeAPIKey = "8M07EYX8NPCD9V8U";
 const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
 
-unsigned int dataFieldFour = 4;                            // Field to write temperature C data
-unsigned int dataFieldFive = 5;
-unsigned int dataFieldOne = 1;
-unsigned int dataFieldTwo = 2;                       // Field to write relative humidity data
-unsigned int dataFieldThree = 3;                     // Field to write temperature F data
-unsigned long lastConnectionTime = 0;
+
 long lastUpdateTime = 0;
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
 char auth[] = "27092c0fc50343bc917a97c755012c9b";
 
-WidgetLED led1(10); //virtual led
+WidgetLED led1(10); // On led
 WidgetLED led2(11); // Auto status
-WidgetLED led3(12); // Box status
+
 
 int gauge1Push_reset;
 int gauge2Push_reset;
@@ -162,14 +157,15 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 //flag for saving data
 bool shouldSaveConfig = false;
 
-BlynkTimer blynktimer, statustimer, checkConnectionTimer;
-Timer t_relay, t_delayStart, timer_delaysend, timer_readsensor, checkFirmware;         // timer for ON period and delay start
+BlynkTimer blynktimer, checkConnectionTimer;
+Timer t_relay, t_delayStart, timer_readsensor, checkFirmware;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
 
-bool send2thingspeak = false;
+
 bool blynkConnectedResult = false;
+int blynkreconnect = 0;
 
 const int MAXRETRY=4; // 0 - 4
 #define BLYNK_GREEN     "#23C48E"
@@ -178,13 +174,20 @@ const int MAXRETRY=4; // 0 - 4
 #define BLYNK_RED       "#D3435C"
 #define BLYNK_DARK_BLUE "#5F7CD8"
 
+#define DEBOUNCE 10  // button debouncer, how many ms to debounce, 5+ ms is usually plenty
+
+
+byte buttons[] = {D0};  // switch
+// This handy macro lets us determine how big the array up above is, by checking the size
+#define NUMBUTTONS sizeof(buttons)
+
+// we will track if a button is just pressed, just released, or 'currently pressed'
+byte pressed[NUMBUTTONS], justpressed[NUMBUTTONS], justreleased[NUMBUTTONS];
+byte previous_keystate[NUMBUTTONS], current_keystate[NUMBUTTONS];
+
+
 void setup()
 {
-  //WiFiManager
-  //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wifiManager;
-  String APName;
-
   Serial.begin(115200);
   Serial.println();
   Serial.println("starting");
@@ -241,7 +244,10 @@ void setup()
     strcpy(c_auth, auth);
     ltoa(channelID, c_channelid, 10);
 
+    // WiFi.begin();
     auto_wifi_connect();
+    Serial.println(WiFi.SSID().c_str());
+    Serial.println(WiFi.psk().c_str());
   }
   else {
     ondemand_wifi_setup();
@@ -268,12 +274,11 @@ void setup()
   blynkConnectedResult = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
   Serial.print("Blynk connect : ");
   Serial.println(blynkConnectedResult);
-  if(!Blynk.connected()) {
-    Serial.println("Not connected to Blynk server, try to reconnect...");
-    Blynk.connect(3333);  // try to connect to server with default timeout
+  if (blynkConnectedResult) {
+    Serial.println("Connected to Blynk server");
   }
   else {
-    Serial.println("Connected to Blynk server");
+    Serial.println("Not connected to Blynk server");
   }
 
   // Setup a function to be called every second
@@ -284,7 +289,6 @@ void setup()
   // blynktimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
   // blynktimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
 
-  // statustimer.setInterval(5000L, sendStatus);
 
   digitalWrite(LED, HIGH);
   delay(500);
@@ -292,7 +296,7 @@ void setup()
   buzzer_sound();
 
   timer_readsensor.every(5000, temp_humi_sensor);
-  checkConnectionTimer.setInterval(30000L, checkBlynkConnection);
+  checkConnectionTimer.setInterval(300000L, checkBlynkConnection);
   checkFirmware.every(86400000L, upintheair);
   upintheair();
 
@@ -300,6 +304,7 @@ void setup()
 
 void loop() {
 
+  httpServer.handleClient();
   blink();
 
   // read data from sensor and action by condition in options, COOL, MOISTURE
@@ -319,12 +324,11 @@ void loop() {
     Serial.println("connection lost, reconnect...");
     microgear.connect(APPID);
   }
-  #endif 
+  #endif
   */
 
   t_relay.update();
   t_delayStart.update();
-  timer_delaysend.update();
   timer_readsensor.update();
   checkFirmware.update();
 
@@ -332,10 +336,18 @@ void loop() {
     Blynk.run();
   }
   // blynktimer.run();
-  // statustimer.run();
+
 
   checkConnectionTimer.run();
 
+  byte thisSwitch=thisSwitch_justPressed();
+  switch(thisSwitch)
+  {
+    case 0:
+      ondemand_wifi_setup();
+      ESP.reset();
+      break;
+  }
 }
 
 void auto_wifi_connect()
@@ -525,40 +537,9 @@ void auto_wifi_connect()
 void ondemand_wifi_setup()
 {
   WiFiManager wifiManager;
-  String APName;
 
-  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
-  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
-  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
-  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
-  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
-  WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
-  WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
-  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
-  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
-  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
-  WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
-
-
-  //set config save notify callback
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
-
-  wifiManager.addParameter(&custom_t_setpoint);
-  wifiManager.addParameter(&custom_t_range);
-  wifiManager.addParameter(&custom_h_setpoint);
-  wifiManager.addParameter(&custom_h_range);
-  wifiManager.addParameter(&custom_c_options);
-  wifiManager.addParameter(&custom_c_cool);
-  wifiManager.addParameter(&custom_c_moisture);
-  wifiManager.addParameter(&custom_c_writeapikey);
-  wifiManager.addParameter(&custom_c_readapikey);
-  wifiManager.addParameter(&custom_c_channelid);
-  wifiManager.addParameter(&custom_c_auth);
-
-  wifiManager.setTimeout(300);
-  APName = "OgoSense-"+String(ESP.getChipId());
   Serial.println("On demand AP");
-  if (!wifiManager.startConfigPortal(APName.c_str())) {
+  if (!wifiManager.startConfigPortal("ogosense")) {
     Serial.println("failed to connect and hit timeout");
     delay(3000);
     //reset and try again, or maybe put it to deep sleep
@@ -568,98 +549,7 @@ void ondemand_wifi_setup()
 
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
-  if (temperature_setpoint > 100 || temperature_setpoint < 0) {
-    temperature_setpoint = 30;
-    shouldSaveConfig = true;
-  }
-  if (temperature_range > 100 || temperature_range < 0) {
-    temperature_range = 2;
-    shouldSaveConfig = true;
-  }
-  if (humidity_setpoint > 100 || humidity_setpoint < 0) {
-    humidity_setpoint = 60;
-    shouldSaveConfig = true;
-  }
-  if (humidity_range > 100 || humidity_range < 0) {
-    humidity_range = 5;
-    shouldSaveConfig = true;
-  }
-  if (options > 2 || options < 0) {
-    options = 1;
-    shouldSaveConfig = true;
-  }
-  if (COOL > 1 || COOL < 0) {
-    COOL = 1;
-    shouldSaveConfig = true;
-  }
-  if (MOISTURE > 1 || MOISTURE < 0) {
-    MOISTURE = 0;
-    shouldSaveConfig = true;
-  }
 
-  if (shouldSaveConfig) {
-    Serial.println("Saving config...");
-    strcpy(t_setpoint, custom_t_setpoint.getValue());
-    strcpy(t_range, custom_t_range.getValue());
-    strcpy(h_setpoint, custom_h_setpoint.getValue());
-    strcpy(h_range, custom_h_range.getValue());
-    strcpy(c_options, custom_c_options.getValue());
-    strcpy(c_cool, custom_c_cool.getValue());
-    strcpy(c_moisture, custom_c_moisture.getValue());
-    strcpy(c_writeapikey, custom_c_writeapikey.getValue());
-    strcpy(c_readapikey, custom_c_readapikey.getValue());
-    strcpy(c_auth, custom_c_auth.getValue());
-    strcpy(c_channelid, custom_c_channelid.getValue());
-
-    temperature_setpoint = atol(t_setpoint);
-    temperature_range = atol(t_range);
-    humidity_setpoint = atol(h_setpoint);
-    humidity_range = atol(h_range);
-    options = atoi(c_options);
-    COOL = atoi(c_cool);
-    MOISTURE = atoi(c_moisture);
-    strcpy(writeAPIKey, c_writeapikey);
-    strcpy(readAPIKey, c_readapikey);
-    strcpy(auth, c_auth);
-    channelID = (unsigned long) atol(c_channelid);
-
-    Serial.print("Temperature : ");
-    Serial.println(t_setpoint);
-    Serial.print("Temperature Range : ");
-    Serial.println(t_range);
-    Serial.print("Humidity : ");
-    Serial.println(h_setpoint);
-    Serial.print("Humidity Range : ");
-    Serial.println(h_range);
-    Serial.print("Option : ");
-    Serial.println(c_options);
-    Serial.print("COOL : ");
-    Serial.println(COOL);
-    Serial.print("MOISTURE : ");
-    Serial.println(MOISTURE);
-    Serial.print("Write API Key : ");
-    Serial.println(writeAPIKey);
-    Serial.print("Read API Key : ");
-    Serial.println(readAPIKey);
-    Serial.print("Channel ID : ");
-    Serial.println(channelID);
-    Serial.print("auth token : ");
-    Serial.println(auth);
-
-    eeWriteInt(0, atoi(h_setpoint));
-    eeWriteInt(4, atoi(h_range));
-    eeWriteInt(8, atoi(t_setpoint));
-    eeWriteInt(12, atoi(t_range));
-    eeWriteInt(16, options);
-    eeWriteInt(20, COOL);
-    eeWriteInt(24, MOISTURE);
-    writeEEPROM(writeAPIKey, 28, 16);
-    writeEEPROM(readAPIKey, 44, 16);
-    writeEEPROM(auth, 60, 32);
-    EEPROMWritelong(92, (long) channelID);
-    eeWriteInt(500, 6550);
-    shouldSaveConfig = false;
-  }
 }
 
 void OnceOnlyTask1()
@@ -675,6 +565,10 @@ void OnceOnlyTask2()
 void temp_humi_sensor()
 {
   int humidity_sensor_value;
+
+  // Debug
+  Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
+
   if(AUTO) {
 
 
@@ -973,17 +867,6 @@ void delayStart()
   Serial.println("Timer Delay Start End.");
 }
 
-//use this function if you want multiple fields simultaneously
-int write2TSData( long TSChannel, unsigned int TSField1, float field1Data, unsigned int TSField2, float field2Data, unsigned int TSField3, float field3Data ){
-
-  ThingSpeak.setField( TSField1, field1Data );
-  ThingSpeak.setField( TSField2, field2Data );
-  ThingSpeak.setField( TSField3, field3Data );
-
-  int writeSuccess = ThingSpeak.writeFields( TSChannel, writeAPIKey );
-  return writeSuccess;
-}
-
 //callback notifying us of the need to save config
 void saveConfigCallback () {
   Serial.println("Should save config");
@@ -1139,17 +1022,17 @@ void blink()
 
 void sendThingSpeak()
 {
-  send2thingspeak = true;
+  unsigned int freeheap = ESP.getFreeHeap();
+  float fahrenheitTemperature = 0;
+  float celsiusTemperature = 0;
+  float rhHumidity = 0;
 
-  if(sht30.get()==0) {
-    // Only update if posting time is exceeded
-    unsigned long currentMillis = millis();
-    if (currentMillis - lastUpdateTime >=  postingInterval) {
-      lastUpdateTime = currentMillis;
 
-      float fahrenheitTemperature, celsiusTemperature;
-      float rhHumidity;
-
+  // Only update if posting time is exceeded
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastUpdateTime >=  postingInterval) {
+    lastUpdateTime = currentMillis;
+    if(sht30.get()==0) {
       fahrenheitTemperature = sht30.fTemp;
       celsiusTemperature = sht30.cTemp;
       rhHumidity = sht30.humidity;
@@ -1161,22 +1044,17 @@ void sendThingSpeak()
       Serial.print(rhHumidity);
       Serial.println();
       Serial.print("Sending data to ThingSpeak : ");
-
-      //ThingSpeak.writeField(channelID, dataFieldOne, celsiusTemperature, writeAPIKey);
-      //ThingSpeak.writeField(channelID, dataFieldTwo, rhHumidity, writeAPIKey);
-      //ThingSpeak.writeField(channelID, dataFieldThree, fahrenheitTemperature, writeAPIKey);
-      // write2TSData(channelID, dataFieldOne, celsiusTemperature, dataFieldTwo, rhHumidity, dataFieldThree, fahrenheitTemperature);
-
-      ThingSpeak.setField( 1, celsiusTemperature );
-      ThingSpeak.setField( 2, rhHumidity );
-      ThingSpeak.setField( 3, digitalRead(RELAY1));
-      int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
-      Serial.println(writeSuccess);
-      Serial.println();
     }
+
+    ThingSpeak.setField( 1, celsiusTemperature );
+    ThingSpeak.setField( 2, rhHumidity );
+    ThingSpeak.setField( 3, digitalRead(RELAY1) );
+    ThingSpeak.setField( 4, (float) freeheap );
+    ThingSpeak.setField( 5, blynkConnectedResult);
+    int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
+    Serial.println(writeSuccess);
+    Serial.println();
   }
-
-
 }
 
 void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
@@ -1188,7 +1066,7 @@ void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
     /*
     if(strcmp(topic, me) == 0) {
       if ((char)msg[0] == '1') {
-        timer_delaysend.after(15 * 1000, sendThingSpeak());
+
       }
     }
     */
@@ -1431,18 +1309,6 @@ void sendSensorH()
   Blynk.virtualWrite(V6, (int) h);
 }
 
-void sendStatus()
-{
-  // if the LED is off turn it on and vice-versa:
-    if (ledStatus == LOW) {
-      ledStatus = HIGH;
-      led3.on();
-    } else {
-      ledStatus = LOW;
-      led3.off();
-    }
-}
-
 void checkBlynkConnection() {
   int mytimeout;
 
@@ -1466,6 +1332,13 @@ void checkBlynkConnection() {
   }
   else {
     Serial.println("Blynk not connected");
+    blynkreconnect++;
+    Serial.print("blynkreconnect: ");
+    Serial.println(blynkreconnect);
+    if (blynkreconnect >= 10) {
+      // delay(60000);
+      // ESP.reset();
+    }
   }
 }
 
@@ -1486,4 +1359,55 @@ void buzzer_sound()
   pinMode(buzzer, OUTPUT);
   digitalWrite(buzzer, LOW);
   delay(300);
+}
+
+
+byte thisSwitch_justPressed() {
+  byte thisSwitch = 255;
+  check_switches();  //check the switches &amp; get the current state
+  for (byte i = 0; i < NUMBUTTONS; i++) {
+    current_keystate[i]=justpressed[i];
+    if (current_keystate[i] != previous_keystate[i]) {
+      if (current_keystate[i]) thisSwitch=i;
+    }
+    previous_keystate[i]=current_keystate[i];
+  }
+  return thisSwitch;
+}
+
+void check_switches()
+{
+  static byte previousstate[NUMBUTTONS];
+  static byte currentstate[NUMBUTTONS];
+  static long lasttime;
+  byte index;
+  if (millis() < lasttime) {
+     lasttime = millis(); // we wrapped around, lets just try again
+  }
+
+  if ((lasttime + DEBOUNCE) > millis()) {
+    return; // not enough time has passed to debounce
+  }
+  // ok we have waited DEBOUNCE milliseconds, lets reset the timer
+  lasttime = millis();
+
+  for (index = 0; index < NUMBUTTONS; index++) {
+    justpressed[index] = 0;       // when we start, we clear out the "just" indicators
+    justreleased[index] = 0;
+
+    currentstate[index] = digitalRead(buttons[index]);   // read the button
+    if (currentstate[index] == previousstate[index]) {
+      if ((pressed[index] == LOW) && (currentstate[index] == LOW)) {
+          // just pressed
+          justpressed[index] = 1;
+      }
+      else if ((pressed[index] == HIGH) && (currentstate[index] == HIGH)) {
+          // just released
+          justreleased[index] = 1;
+      }
+      pressed[index] = !currentstate[index];  // remember, digital HIGH means NOT pressed
+    }
+    //Serial.println(pressed[index], DEC);
+    previousstate[index] = currentstate[index];   // keep a running tally of the buttons
+  }
 }
