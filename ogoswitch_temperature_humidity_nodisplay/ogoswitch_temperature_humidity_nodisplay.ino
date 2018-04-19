@@ -23,8 +23,8 @@ SOFTWARE.
 */
 
 /* Comment this out to disable prints and save space */
-//#define BLYNK_DEBUG // Optional, this enables lots of prints
-//#define BLYNK_PRINT Serial
+// #define BLYNK_DEBUG // Optional, this enables lots of prints
+// #define BLYNK_PRINT Serial
 
 
 #include <SPI.h>
@@ -44,8 +44,9 @@ SOFTWARE.
 
 #include <EEPROM.h>
 #include <Timer.h>
+#ifdef NETPIE
 #include <MicroGear.h>
-
+#endif
 #include <WiFiClient.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPUpdateServer.h>
@@ -60,9 +61,13 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 6;
+const int FW_VERSION = 7;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
-String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini"; // ogoswitch_temperature_humidity_nodisplay.ino.d1_mini
+#ifdef ARDUINO_ESP8266_WEMOS_D1MINI
+  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
+#elif ARDUINO_ESP8266_WEMOS_D1MINILITE
+  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minilite";
+#endif
 
 
 #define APPID   "OgoSense"                  // application id from netpie
@@ -144,7 +149,9 @@ int options = 0;            // option : 0 = humidity only, 1 = temperature only,
 
 
 WiFiClient client;
+#ifdef NETPIE
 MicroGear microgear(client);
+#endif
 
 const long interval = 1000;
 int ledState = LOW;
@@ -268,7 +275,7 @@ void setup()
   else {
     Serial.println("Not connected to Blynk server");
   }
-  
+
 
   // Setup a function to be called every second
   // gauge1Push_reset = blynktimer.setInterval(300000L, sendSensorT);
@@ -278,7 +285,7 @@ void setup()
   // blynktimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
   // blynktimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
 
-  
+
 
   digitalWrite(LED, HIGH);
   delay(500);
@@ -328,9 +335,10 @@ void loop() {
     Blynk.run();
   }
   // blynktimer.run();
-  
+
 
   checkConnectionTimer.run();
+  delay(100);
 
 }
 
@@ -671,6 +679,8 @@ void OnceOnlyTask2()
 void temp_humi_sensor()
 {
   int humidity_sensor_value;
+
+  Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
   if(AUTO) {
 
 
@@ -1126,21 +1136,22 @@ void blink()
 }
 
 void sendThingSpeak()
-{   
+{
+  unsigned int freeheap = ESP.getFreeHeap();
   float fahrenheitTemperature = 0;
   float celsiusTemperature = 0;
-  float rhHumidity = 0; 
+  float rhHumidity = 0;
   // Only update if posting time is exceeded
   unsigned long currentMillis = millis();
- 
+
   if (currentMillis - lastUpdateTime >=  postingInterval) {
     lastUpdateTime = currentMillis;
-       
+
     if(sht30.get()==0) {
       fahrenheitTemperature = sht30.fTemp;
       celsiusTemperature = sht30.cTemp;
       rhHumidity = sht30.humidity;
-  
+
       Serial.print(celsiusTemperature);
       Serial.print(", ");
       Serial.print(fahrenheitTemperature);
@@ -1149,17 +1160,20 @@ void sendThingSpeak()
       Serial.println();
       Serial.print("Sending data to ThingSpeak : ");
     }
-      
+
     ThingSpeak.setField( 1, celsiusTemperature );
     ThingSpeak.setField( 2, rhHumidity );
     ThingSpeak.setField( 3, digitalRead(RELAY1));
+    ThingSpeak.setField( 4, (float) freeheap );
+    ThingSpeak.setField( 5, blynkConnectedResult);
     int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
     Serial.println(writeSuccess);
     Serial.println();
-    
+
   }
 }
 
+#ifdef NETPIE
 void onMsghandler(char *topic, uint8_t* msg, unsigned int msglen)
 {
     Serial.print("Incoming message --> ");
@@ -1182,6 +1196,7 @@ void onConnected(char *attribute, uint8_t* msg, unsigned int msglen)
     microgear.setAlias((char *) ALIAS.c_str());
     microgear.subscribe(me);
 }
+#endif
 
 BLYNK_WRITE(V1)
 {
@@ -1425,6 +1440,7 @@ void checkBlynkConnection() {
     Serial.println("Blynk trying to reconnect.");
     while (!blynkConnectedResult) {
       blynkConnectedResult = Blynk.connect(3333);
+      Serial.print(".");
       if((millis() / 1000) > mytimeout + 3) { // try for less than 4 seconds
         Serial.println("Blynk reconnect timeout.");
         break;

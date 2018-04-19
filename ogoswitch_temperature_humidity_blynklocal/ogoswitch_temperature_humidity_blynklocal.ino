@@ -348,6 +348,7 @@ void loop() {
       ESP.reset();
       break;
   }
+  delay(100);
 }
 
 void auto_wifi_connect()
