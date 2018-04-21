@@ -296,7 +296,7 @@ void setup()
   buzzer_sound();
 
   timer_readsensor.every(5000, temp_humi_sensor);
-  checkConnectionTimer.setInterval(300000L, checkBlynkConnection);
+  checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
   checkFirmware.every(86400000L, upintheair);
   upintheair();
 
@@ -348,7 +348,7 @@ void loop() {
       ESP.reset();
       break;
   }
-  delay(100);
+  
 }
 
 void auto_wifi_connect()

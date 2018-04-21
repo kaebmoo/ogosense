@@ -61,7 +61,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 7;
+const int FW_VERSION = 8;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
   String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
@@ -293,7 +293,7 @@ void setup()
   buzzer_sound();
 
   timer_readsensor.every(5000, temp_humi_sensor);
-  checkConnectionTimer.setInterval(300000L, checkBlynkConnection);
+  checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
   checkFirmware.every(86400000L, upintheair);
   upintheair();
 
@@ -338,7 +338,6 @@ void loop() {
 
 
   checkConnectionTimer.run();
-  delay(100);
 
 }
 
