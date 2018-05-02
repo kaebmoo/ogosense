@@ -61,7 +61,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 8;
+const int FW_VERSION = 9;
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
   String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
@@ -70,13 +70,6 @@ const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #endif
 
 
-#define APPID   "OgoSense"                  // application id from netpie
-#define KEY     "sYZknE19LHxr1zJ"           // key from netpie
-#define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
-
-String ALIAS = "ogosense-0000";              // alias name netpie
-char *me = "/ogosense/0000000";                  // topic set for sensor box
-char *mystatus = "/ogosense/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
@@ -150,6 +143,14 @@ int options = 0;            // option : 0 = humidity only, 1 = temperature only,
 
 WiFiClient client;
 #ifdef NETPIE
+#define APPID   "OgoSense"                  // application id from netpie
+#define KEY     "sYZknE19LHxr1zJ"           // key from netpie
+#define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
+
+String ALIAS = "ogosense-0000";              // alias name netpie
+char *me = "/ogosense/0000000";                  // topic set for sensor box
+char *mystatus = "/ogosense/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
+
 MicroGear microgear(client);
 #endif
 
@@ -163,8 +164,8 @@ const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for r
 //flag for saving data
 bool shouldSaveConfig = false;
 
-BlynkTimer blynktimer, checkConnectionTimer;
-Timer t_relay, t_delayStart, timer_readsensor, checkFirmware;         // timer for ON period and delay start
+BlynkTimer blynkTimer, checkConnectionTimer;
+Timer t_relay, t_delayStart, t_readSensor, t_checkFirmware;         // timer for ON period and delay start
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
@@ -178,6 +179,8 @@ const int MAXRETRY=4; // 0 - 4
 #define BLYNK_YELLOW    "#ED9D00"
 #define BLYNK_RED       "#D3435C"
 #define BLYNK_DARK_BLUE "#5F7CD8"
+
+#define DISPLAYTIME 4000  // milliseconds display time temperature and humidity
 
 void setup()
 {
@@ -207,11 +210,15 @@ void setup()
   microgear.on(MESSAGE,onMsghandler);
   microgear.on(CONNECTED,onConnected);
   microgear.setEEPROMOffset(512);
+
+  
+  ALIAS = "ogosense-"+String(ESP.getChipId());
+  Serial.print(me);
+  Serial.print("\t");
+  Serial.print(ALIAS);
+  Serial.print("\t");
+  Serial.println(mystatus);
   #endif
-
-
-
-
 
 
   // read config from eeprom
@@ -245,7 +252,7 @@ void setup()
     auto_wifi_connect();
   }
   else {
-    ondemand_wifi_setup();
+    // ondemand_wifi_setup();
   }
 
   // web update OTA
@@ -265,7 +272,13 @@ void setup()
   microgear.connect(APPID);
   #endif
 
+  #ifdef BLYNKLOCAL
+  Blynk.config(auth, "blynk.ogonan.com", 80);
+  #else
   Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
+  #endif
+
+
   blynkConnectedResult = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
   Serial.print("Blynk connect : ");
   Serial.println(blynkConnectedResult);
@@ -278,12 +291,12 @@ void setup()
 
 
   // Setup a function to be called every second
-  // gauge1Push_reset = blynktimer.setInterval(300000L, sendSensorT);
-  // gauge2Push_reset = blynktimer.setInterval(300000L, sendSensorH);
+  // gauge1Push_reset = blynkTimer.setInterval(300000L, sendSensorT);
+  // gauge2Push_reset = blynkTimer.setInterval(300000L, sendSensorH);
 
   // ตั้งการส่งให้เหลื่อมกัน 150ms
-  // blynktimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
-  // blynktimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
+  // blynkTimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
+  // blynkTimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
 
 
 
@@ -292,9 +305,10 @@ void setup()
   digitalWrite(LED, LOW);
   buzzer_sound();
 
-  timer_readsensor.every(5000, temp_humi_sensor);
+  blynkTimer.setInterval(DISPLAYTIME, displayTemperature);
+  t_readSensor.every(5000, temp_humi_sensor);
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
-  checkFirmware.every(86400000L, upintheair);
+  t_checkFirmware.every(86400000L, upintheair);
   upintheair();
 
 }
@@ -302,16 +316,13 @@ void setup()
 void loop() {
 
   httpServer.handleClient();
-
-  blink();
+  blink();  // flash LED
 
   // read data from sensor and action by condition in options, COOL, MOISTURE
-  // temp_humi_sensor() every 1 sec.
-
+  // temp_humi_sensor() every x sec.
   sendThingSpeak();
-  /*
-   * netpie connect
-   *
+
+  /** netpie connect **/
   #ifdef NETPIE
   if (microgear.connected()) {
     microgear.loop();
@@ -323,21 +334,17 @@ void loop() {
     microgear.connect(APPID);
   }
   #endif
-  */
-
-  t_relay.update();
-  t_delayStart.update();
-
-  timer_readsensor.update();
-  checkFirmware.update();
 
   if (Blynk.connected()) {
     Blynk.run();
   }
-  // blynktimer.run();
 
-
+  blynkTimer.run();
   checkConnectionTimer.run();
+  t_relay.update();
+  t_delayStart.update();
+  t_readSensor.update();
+  t_checkFirmware.update();
 
 }
 
@@ -453,12 +460,6 @@ void auto_wifi_connect()
   Serial.print("auth token : ");
   Serial.println(auth);
 
-  ALIAS = "ogosense-"+String(ESP.getChipId());
-  Serial.print(me);
-  Serial.print("\t");
-  Serial.print(ALIAS);
-  Serial.print("\t");
-  Serial.println(mystatus);
 
   if (shouldSaveConfig) {
     Serial.println("Saving config...");
@@ -667,13 +668,25 @@ void ondemand_wifi_setup()
 
 void OnceOnlyTask1()
 {
-  blynktimer.restartTimer(gauge1Push_reset);
+  blynkTimer.restartTimer(gauge1Push_reset);
 }
 
 void OnceOnlyTask2()
 {
-  blynktimer.restartTimer(gauge2Push_reset);
+  blynkTimer.restartTimer(gauge2Push_reset);
 }
+
+#ifdef SOILMOISTURE
+void soilMoistureSensor()
+{
+  int soilMoisture;
+
+  soilMoisture = analogRead(analogReadPin);
+  Serial.print("Analog Read : ");
+  Serial.println(soilMoisture);
+
+}
+#endif
 
 void temp_humi_sensor()
 {
@@ -681,21 +694,6 @@ void temp_humi_sensor()
 
   Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
   if(AUTO) {
-
-
-    /*
-    options = analogRead(analogReadPin);
-    Serial.print("Analog Read : ");
-    Serial.print(options);
-
-    if (options < 100)
-      options = 0;  // humidity
-     else if (options > 100 && options < 200)
-      options = 1;  // temperature
-     else
-      options = 2;  // temperature && humidity
-    */
-
     Serial.print("\tOptions : ");
     Serial.println(options);
 
@@ -920,27 +918,25 @@ void upintheair()
   // ESPhttpUpdate.update("www.ogonan.com", 80, "/ogoupdate/ogoswitch_blynk.ino.d1_mini.bin");
 }
 
-void segment_display()
+void displayHumidity()
+{
+  float tempdisplay = sht30.humidity * 10;
+  uint8_t data[] = { 0x00, 0x00, 0x00, 0x76 };  // 0x76 = H
+
+  display.setSegments(data);
+  tempdisplay = sht30.humidity * 10;
+  display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
+
+}
+
+void displayTemperature()
 {
     float tempdisplay = sht30.cTemp * 10;
+    uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };  // //  gfedcba 00111001 = 0011 1001 = 0x39 = C
 
-    //  gfedcba
-    // 00111001 = 0011 1001 = 0x39 = C
-
-    uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };
     display.setSegments(data);
     display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    delay(2000);
-
-    // 0x76 = H
-    data[0] = 0x00;
-    data[1] = 0x00;
-    data[2] = 0x00;
-    data[3] = 0x76;
-    display.setSegments(data);
-    tempdisplay = sht30.humidity * 10;
-    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    delay(2000);
+    blynkTimer.setTimeout(DISPLAYTIME/2, displayHumidity);
 }
 
 void turnrelay_onoff(uint8_t value)
@@ -1434,7 +1430,6 @@ void checkBlynkConnection() {
   blynkConnectedResult = Blynk.connected();
   if (!blynkConnectedResult) {
     Serial.println("Blynk not connected");
-    Blynk.config(auth);
     mytimeout = millis() / 1000;
     Serial.println("Blynk trying to reconnect.");
     while (!blynkConnectedResult) {

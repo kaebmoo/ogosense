@@ -250,7 +250,7 @@ void setup()
     Serial.println(WiFi.psk().c_str());
   }
   else {
-    ondemand_wifi_setup();
+    // ondemand_wifi_setup();
   }
 
   // web update OTA
@@ -344,11 +344,11 @@ void loop() {
   switch(thisSwitch)
   {
     case 0:
-      ondemand_wifi_setup();
-      ESP.reset();
+      // ondemand_wifi_setup();
+      // ESP.reset();
       break;
   }
-  
+
 }
 
 void auto_wifi_connect()
@@ -1317,7 +1317,6 @@ void checkBlynkConnection() {
   blynkConnectedResult = Blynk.connected();
   if (!blynkConnectedResult) {
     Serial.println("Blynk not connected");
-    Blynk.config(auth, "ogoservice.ogonan.com", 80);
     mytimeout = millis() / 1000;
     Serial.println("Blynk trying to reconnect.");
     while (!blynkConnectedResult) {
