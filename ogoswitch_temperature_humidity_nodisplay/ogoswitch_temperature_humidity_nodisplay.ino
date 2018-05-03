@@ -691,13 +691,15 @@ void soilMoistureSensor()
   Serial.print("Analog Read : ");
   Serial.println(soilMoisture);
   
-  if (soilMoisture > 500) {        
-    if (digitalRead(RELAY1) == HIGH) {
+  if (soilMoisture > 500) {       
+    Serial.println("High Moisture"); 
+    if (digitalRead(RELAY1) == LOW) {
+      Serial.println("Soil Moisture: Turn Relay On");
       delay(300);
-      turnrelay_onoff(LOW);
-      Blynk.virtualWrite(V1, 0);
+      turnrelay_onoff(HIGH);
+      Blynk.virtualWrite(V1, 1);
       // Blynk.syncVirtual(V1);
-      RelayEvent = false;
+      RelayEvent = true;
     }
     if (AUTO == true) {
       keepState = 1;
@@ -707,6 +709,14 @@ void soilMoistureSensor()
     }
   }  
   else {
+    Serial.println("Low Moisture");
+    if (digitalRead(RELAY1) == HIGH) {
+      Serial.println("Soil Moisture: Turn Relay Off");
+      delay(300);
+      turnrelay_onoff(LOW);
+      Blynk.virtualWrite(V1, 0);
+      RelayEvent = false;
+    }
     if (keepState == 1) {
       AUTO = true;
       Blynk.virtualWrite(V2, 1);  
