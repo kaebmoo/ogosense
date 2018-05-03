@@ -26,6 +26,7 @@ SOFTWARE.
 // #define BLYNK_DEBUG // Optional, this enables lots of prints
 // #define BLYNK_PRINT Serial
 
+#define SOILMOISTURE
 
 #include <SPI.h>
 #include <SD.h>
@@ -306,6 +307,9 @@ void setup()
   buzzer_sound();
 
   blynkTimer.setInterval(DISPLAYTIME, displayTemperature);
+  #ifdef SOILMOISTURE
+  blynkTimer.setInterval(5000, soilMoistureSensor);
+  #endif
   t_readSensor.every(5000, temp_humi_sensor);
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
   t_checkFirmware.every(86400000L, upintheair);
@@ -677,6 +681,8 @@ void OnceOnlyTask2()
 }
 
 #ifdef SOILMOISTURE
+int keepState = 0;
+
 void soilMoistureSensor()
 {
   int soilMoisture;
@@ -684,7 +690,27 @@ void soilMoistureSensor()
   soilMoisture = analogRead(analogReadPin);
   Serial.print("Analog Read : ");
   Serial.println(soilMoisture);
-
+  
+  if (soilMoisture > 500) {        
+    if (digitalRead(RELAY1) == HIGH) {
+      turnrelay_onoff(LOW);
+      Blynk.virtualWrite(V1, 0);
+      // Blynk.syncVirtual(V1);
+      RelayEvent = false;
+    }
+    if (AUTO == true) {
+      keepState = 1;
+      AUTO = false;
+      Blynk.virtualWrite(V2, 0);  
+      led2.off();
+    }
+  }  
+  else {
+    if (keepState == 1) {
+      AUTO = true;
+      keepState = 0;
+    }
+  }
 }
 #endif
 
