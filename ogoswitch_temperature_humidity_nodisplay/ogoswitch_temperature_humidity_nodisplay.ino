@@ -693,6 +693,7 @@ void soilMoistureSensor()
   
   if (soilMoisture > 500) {        
     if (digitalRead(RELAY1) == HIGH) {
+      delay(300);
       turnrelay_onoff(LOW);
       Blynk.virtualWrite(V1, 0);
       // Blynk.syncVirtual(V1);
@@ -708,6 +709,7 @@ void soilMoistureSensor()
   else {
     if (keepState == 1) {
       AUTO = true;
+      Blynk.virtualWrite(V2, 1);  
       keepState = 0;
     }
   }
