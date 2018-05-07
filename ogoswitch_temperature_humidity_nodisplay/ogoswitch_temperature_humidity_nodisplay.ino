@@ -28,6 +28,7 @@ SOFTWARE.
 
 #define SOILMOISTURE
 #define BLYNKLOCAL
+// #define BLYNK
 
 #include <SPI.h>
 #include <SD.h>
@@ -95,7 +96,7 @@ int gauge2Push_reset;
 
 int ledStatus = LOW;             // ledStatus used to set the LED
 const int chipSelect = D8; // SD CARD
-const int CLK = D6; //Set the CLK pin connection to the display
+const int CLK = D4; // D6 Set the CLK pin connection to the display
 const int DIO = D3; //Set the DIO pin connection to the display
 
 const int buzzer=D5; //Buzzer control port, default D5
@@ -303,7 +304,8 @@ void setup()
   digitalWrite(LED, LOW);
   buzzer_sound();
 
-  blynkTimer.setInterval(DISPLAYTIME, displayTemperature);
+  blynkTimer.setInterval(DISPLAYTIME,   displayTemperature);
+  
   #ifdef SOILMOISTURE
   blynkTimer.setInterval(5000, soilMoistureSensor);
   #endif
@@ -552,9 +554,9 @@ void soilMoistureSensor()
   if (soilMoisture > 500) {       
     Serial.println("High Moisture"); 
     if (digitalRead(RELAY1) == LOW) {
-      Serial.println("Soil Moisture: Turn Relay On");
-      delay(300);
+      Serial.println("Soil Moisture: Turn Relay On");      
       turnrelay_onoff(HIGH);
+      delay(300);
       Blynk.virtualWrite(V1, 1);
       // Blynk.syncVirtual(V1);
       RelayEvent = true;
@@ -569,9 +571,9 @@ void soilMoistureSensor()
   else {
     Serial.println("Low Moisture");
     if (digitalRead(RELAY1) == HIGH) {
-      Serial.println("Soil Moisture: Turn Relay Off");
-      delay(300);
+      Serial.println("Soil Moisture: Turn Relay Off");      
       turnrelay_onoff(LOW);
+      delay(300);
       Blynk.virtualWrite(V1, 0);
       RelayEvent = false;
     }
@@ -816,7 +818,7 @@ void upintheair()
 
 void displayHumidity()
 {
-  float tempdisplay = sht30.humidity * 10;
+  float tempdisplay;
   uint8_t data[] = { 0x00, 0x00, 0x00, 0x76 };  // 0x76 = H
 
   display.setSegments(data);
@@ -827,12 +829,13 @@ void displayHumidity()
 
 void displayTemperature()
 {
-    float tempdisplay = sht30.cTemp * 10;
+    float tempdisplay;
     uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };  // //  gfedcba 00111001 = 0011 1001 = 0x39 = C
 
     display.setSegments(data);
+    tempdisplay = sht30.cTemp * 10;
     display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    blynkTimer.setTimeout(DISPLAYTIME/2, displayHumidity);
+    blynkTimer.setTimeout(2000, displayHumidity);
 }
 
 void turnrelay_onoff(uint8_t value)
@@ -1180,7 +1183,7 @@ BLYNK_WRITE(V22)
   Serial.println(options);
 }
 
-BLYNK_WRITE(V23)
+BLYNK_WRITE(V69)
 {
   int pinValue = param.asInt(); // assigning incoming value from pin V23 to a variable
 
