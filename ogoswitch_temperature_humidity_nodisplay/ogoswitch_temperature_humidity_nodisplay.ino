@@ -28,6 +28,10 @@ SOFTWARE.
 
 #define SOILMOISTURE
 #define BLYNKLOCAL
+<<<<<<< HEAD
+=======
+// #define BLYNK
+>>>>>>> cef55dae2f2ca23fdf23ee0df25590605cf84cf5
 
 #include <SPI.h>
 #include <SD.h>
@@ -95,7 +99,6 @@ int gauge2Push_reset;
 
 int ledStatus = LOW;             // ledStatus used to set the LED
 const int chipSelect = D8; // SD CARD
-const int CLK = D6; //Set the CLK pin connection to the display
 const int DIO = D3; //Set the DIO pin connection to the display
 
 const int buzzer=D5; //Buzzer control port, default D5
@@ -249,14 +252,10 @@ void setup()
     strcpy(c_writeapikey,  writeAPIKey);
     strcpy(c_readapikey, readAPIKey);
     strcpy(c_auth, auth);
-    ltoa(channelID, c_channelid, 10);
-
-    auto_wifi_connect();
+    ltoa(channelID, c_channelid, 10);    
   }
-  else {
-    // ondemand_wifi_setup();
-  }
-
+  autoWifiConnect();
+  
   // web update OTA
   String host_update_name;
   host_update_name = "ogoswitch-"+String(ESP.getChipId());
@@ -307,10 +306,18 @@ void setup()
   digitalWrite(LED, LOW);
   buzzer_sound();
 
+<<<<<<< HEAD
   blynkTimer.setInterval(DISPLAYTIME, displayTemperature);
   // #ifdef SOILMOISTURE
   // blynkTimer.setInterval(5000, soilMoistureSensor);
   // #endif
+=======
+  blynkTimer.setInterval(DISPLAYTIME,   displayTemperature);
+  
+  #ifdef SOILMOISTURE
+  blynkTimer.setInterval(5000, soilMoistureSensor);
+  #endif
+>>>>>>> cef55dae2f2ca23fdf23ee0df25590605cf84cf5
   t_readSensor.every(5000, temp_humi_sensor);
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
   t_checkFirmware.every(86400000L, upintheair);
@@ -352,7 +359,7 @@ void loop() {
 
 }
 
-void auto_wifi_connect()
+void autoWifiConnect()
 {
   WiFiManager wifiManager;
   String APName;
@@ -530,145 +537,6 @@ void auto_wifi_connect()
   }
 }
 
-void ondemand_wifi_setup()
-{
-  WiFiManager wifiManager;
-  String APName;
-
-  WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
-  WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
-  WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
-  WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
-  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
-  WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
-  WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
-  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
-  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
-  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
-  WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 37);
-
-
-  //set config save notify callback
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
-
-  wifiManager.addParameter(&custom_t_setpoint);
-  wifiManager.addParameter(&custom_t_range);
-  wifiManager.addParameter(&custom_h_setpoint);
-  wifiManager.addParameter(&custom_h_range);
-  wifiManager.addParameter(&custom_c_options);
-  wifiManager.addParameter(&custom_c_cool);
-  wifiManager.addParameter(&custom_c_moisture);
-  wifiManager.addParameter(&custom_c_writeapikey);
-  wifiManager.addParameter(&custom_c_readapikey);
-  wifiManager.addParameter(&custom_c_channelid);
-  wifiManager.addParameter(&custom_c_auth);
-
-  wifiManager.setTimeout(300);
-  APName = "OgoSense-"+String(ESP.getChipId());
-  Serial.println("On demand AP");
-  if (!wifiManager.startConfigPortal(APName.c_str())) {
-    Serial.println("failed to connect and hit timeout");
-    delay(3000);
-    //reset and try again, or maybe put it to deep sleep
-    ESP.reset();
-    delay(5000);
-  }
-
-  //if you get here you have connected to the WiFi
-  Serial.println("connected...yeey :)");
-  if (temperature_setpoint > 100 || temperature_setpoint < 0) {
-    temperature_setpoint = 30;
-    shouldSaveConfig = true;
-  }
-  if (temperature_range > 100 || temperature_range < 0) {
-    temperature_range = 2;
-    shouldSaveConfig = true;
-  }
-  if (humidity_setpoint > 100 || humidity_setpoint < 0) {
-    humidity_setpoint = 60;
-    shouldSaveConfig = true;
-  }
-  if (humidity_range > 100 || humidity_range < 0) {
-    humidity_range = 5;
-    shouldSaveConfig = true;
-  }
-  if (options > 2 || options < 0) {
-    options = 1;
-    shouldSaveConfig = true;
-  }
-  if (COOL > 1 || COOL < 0) {
-    COOL = 1;
-    shouldSaveConfig = true;
-  }
-  if (MOISTURE > 1 || MOISTURE < 0) {
-    MOISTURE = 0;
-    shouldSaveConfig = true;
-  }
-
-  if (shouldSaveConfig) {
-    Serial.println("Saving config...");
-    strcpy(t_setpoint, custom_t_setpoint.getValue());
-    strcpy(t_range, custom_t_range.getValue());
-    strcpy(h_setpoint, custom_h_setpoint.getValue());
-    strcpy(h_range, custom_h_range.getValue());
-    strcpy(c_options, custom_c_options.getValue());
-    strcpy(c_cool, custom_c_cool.getValue());
-    strcpy(c_moisture, custom_c_moisture.getValue());
-    strcpy(c_writeapikey, custom_c_writeapikey.getValue());
-    strcpy(c_readapikey, custom_c_readapikey.getValue());
-    strcpy(c_auth, custom_c_auth.getValue());
-    strcpy(c_channelid, custom_c_channelid.getValue());
-
-    temperature_setpoint = atol(t_setpoint);
-    temperature_range = atol(t_range);
-    humidity_setpoint = atol(h_setpoint);
-    humidity_range = atol(h_range);
-    options = atoi(c_options);
-    COOL = atoi(c_cool);
-    MOISTURE = atoi(c_moisture);
-    strcpy(writeAPIKey, c_writeapikey);
-    strcpy(readAPIKey, c_readapikey);
-    strcpy(auth, c_auth);
-    channelID = (unsigned long) atol(c_channelid);
-
-    Serial.print("Temperature : ");
-    Serial.println(t_setpoint);
-    Serial.print("Temperature Range : ");
-    Serial.println(t_range);
-    Serial.print("Humidity : ");
-    Serial.println(h_setpoint);
-    Serial.print("Humidity Range : ");
-    Serial.println(h_range);
-    Serial.print("Option : ");
-    Serial.println(c_options);
-    Serial.print("COOL : ");
-    Serial.println(COOL);
-    Serial.print("MOISTURE : ");
-    Serial.println(MOISTURE);
-    Serial.print("Write API Key : ");
-    Serial.println(writeAPIKey);
-    Serial.print("Read API Key : ");
-    Serial.println(readAPIKey);
-    Serial.print("Channel ID : ");
-    Serial.println(channelID);
-    Serial.print("auth token : ");
-    Serial.println(auth);
-
-    eeWriteInt(0, atoi(h_setpoint));
-    eeWriteInt(4, atoi(h_range));
-    eeWriteInt(8, atoi(t_setpoint));
-    eeWriteInt(12, atoi(t_range));
-    eeWriteInt(16, options);
-    eeWriteInt(20, COOL);
-    eeWriteInt(24, MOISTURE);
-    writeEEPROM(writeAPIKey, 28, 16);
-    writeEEPROM(readAPIKey, 44, 16);
-    writeEEPROM(auth, 60, 32);
-    EEPROMWritelong(92, (long) channelID);
-    eeWriteInt(500, 6550);
-    shouldSaveConfig = false;
-  }
-}
 
 void OnceOnlyTask1()
 {
@@ -694,9 +562,9 @@ void soilMoistureSensor()
   if (soilMoisture > 500) {
     Serial.println("High Moisture");
     if (digitalRead(RELAY1) == LOW) {
-      Serial.println("Soil Moisture: Turn Relay On");
-      delay(300);
+      Serial.println("Soil Moisture: Turn Relay On");      
       turnrelay_onoff(HIGH);
+      delay(300);
       Blynk.virtualWrite(V1, 1);
       // Blynk.syncVirtual(V1);
       RelayEvent = true;
@@ -713,9 +581,9 @@ void soilMoistureSensor()
   else {
     Serial.println("Low Moisture");
     if (digitalRead(RELAY1) == HIGH) {
-      Serial.println("Soil Moisture: Turn Relay Off");
-      delay(300);
+      Serial.println("Soil Moisture: Turn Relay Off");      
       turnrelay_onoff(LOW);
+      delay(300);
       Blynk.virtualWrite(V1, 0);
       RelayEvent = false;
     }
@@ -966,7 +834,7 @@ void upintheair()
 
 void displayHumidity()
 {
-  float tempdisplay = sht30.humidity * 10;
+  float tempdisplay;
   uint8_t data[] = { 0x00, 0x00, 0x00, 0x76 };  // 0x76 = H
 
   display.setSegments(data);
@@ -977,12 +845,13 @@ void displayHumidity()
 
 void displayTemperature()
 {
-    float tempdisplay = sht30.cTemp * 10;
+    float tempdisplay;
     uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };  // //  gfedcba 00111001 = 0011 1001 = 0x39 = C
 
     display.setSegments(data);
+    tempdisplay = sht30.cTemp * 10;
     display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    blynkTimer.setTimeout(DISPLAYTIME/2, displayHumidity);
+    blynkTimer.setTimeout(2000, displayHumidity);
 }
 
 void turnrelay_onoff(uint8_t value)
@@ -1330,7 +1199,7 @@ BLYNK_WRITE(V22)
   Serial.println(options);
 }
 
-BLYNK_WRITE(V23)
+BLYNK_WRITE(V69)
 {
   int pinValue = param.asInt(); // assigning incoming value from pin V23 to a variable
 
