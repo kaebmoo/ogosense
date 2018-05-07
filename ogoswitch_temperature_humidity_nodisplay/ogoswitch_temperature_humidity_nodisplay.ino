@@ -99,7 +99,7 @@ int gauge2Push_reset;
 
 int ledStatus = LOW;             // ledStatus used to set the LED
 const int chipSelect = D8; // SD CARD
-const int CLK = D4; // D6 Set the CLK pin connection to the display
+const int CLK = D6; // D6 Set the CLK pin connection to the display
 const int DIO = D3; //Set the DIO pin connection to the display
 
 const int buzzer=D5; //Buzzer control port, default D5
@@ -172,6 +172,7 @@ bool shouldSaveConfig = false;
 
 BlynkTimer blynkTimer, checkConnectionTimer;
 Timer t_relay, t_delayStart, t_readSensor, t_checkFirmware;         // timer for ON period and delay start
+// Timer t_displayTemperature, t_displayHumidity;
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
@@ -186,7 +187,8 @@ const int MAXRETRY=4; // 0 - 4
 #define BLYNK_RED       "#D3435C"
 #define BLYNK_DARK_BLUE "#5F7CD8"
 
-#define DISPLAYTIME 4000  // milliseconds display time temperature and humidity
+const unsigned long DISPLAYTIME = 5000L;  // milliseconds display time temperature and humidity
+// int timerID = -1;
 
 void setup()
 {
@@ -293,12 +295,12 @@ void setup()
 
 
   // Setup a function to be called every second
-  // gauge1Push_reset = blynkTimer.setInterval(300000L, sendSensorT);
-  // gauge2Push_reset = blynkTimer.setInterval(300000L, sendSensorH);
+  // gauge1Push_reset = blynkTimer.setInterval(4000L, displayTemperature);
+  // gauge2Push_reset = blynkTimer.setInterval(4000L, displayHumidity);
 
-  // ตั้งการส่งให้เหลื่อมกัน 150ms
-  // blynkTimer.setTimeout(150, OnceOnlyTask1); // Guage V5 temperature
-  // blynkTimer.setTimeout(300, OnceOnlyTask2); // Guage v6 humidity
+  // ตั้งการส่งให้เหลื่อมกัน 2000ms
+  // blynkTimer.setTimeout(2000, OnceOnlyTask1); // Guage V5 temperature
+  // blynkTimer.setTimeout(4000, OnceOnlyTask2); // Guage v6 humidity
 
 
 
@@ -307,7 +309,8 @@ void setup()
   digitalWrite(LED, LOW);
   buzzer_sound();
 
-  blynkTimer.setInterval(DISPLAYTIME,   displayTemperature);
+  
+  // t_displayTemperature.every(DISPLAYTIME, displayTemperature);
 
   #ifdef SOILMOISTURE
   blynkTimer.setInterval(5000, soilMoistureSensor);
@@ -317,7 +320,7 @@ void setup()
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
   t_checkFirmware.every(86400000L, upintheair);
   upintheair();
-
+  displayTemperature();
 }
 
 void loop() {
@@ -351,6 +354,8 @@ void loop() {
   t_delayStart.update();
   t_readSensor.update();
   t_checkFirmware.update();
+  //t_displayTemperature.update();
+  //t_displayHumidity.update();
 
 }
 
@@ -564,14 +569,6 @@ void soilMoistureSensor()
       // Blynk.syncVirtual(V1);
       RelayEvent = true;
     }
-    /*
-    if (AUTO == true) {
-      keepState = 1;
-      AUTO = false;
-      Blynk.virtualWrite(V2, 0);
-      led2.off();
-    }
-    */
   }
   else {
     Serial.println("Low Moisture");
@@ -582,13 +579,6 @@ void soilMoistureSensor()
       Blynk.virtualWrite(V1, 0);
       RelayEvent = false;
     }
-    /*
-    if (keepState == 1) {
-      AUTO = true;
-      Blynk.virtualWrite(V2, 1);
-      keepState = 0;
-    }
-    */
   }
 }
 #endif
@@ -770,6 +760,14 @@ void temp_humi_sensor()
       Serial.println("Sensor Error!");
     }
   }
+  if (ledStatus == LOW) {
+    ledStatus = HIGH;
+    displayTemperature();
+  }
+  else {
+    ledStatus = LOW;
+    displayHumidity();
+  }
 }
 
 void upintheair()
@@ -827,26 +825,44 @@ void upintheair()
   // ESPhttpUpdate.update("www.ogonan.com", 80, "/ogoupdate/ogoswitch_blynk.ino.d1_mini.bin");
 }
 
+
 void displayHumidity()
 {
   float tempdisplay;
   uint8_t data[] = { 0x00, 0x00, 0x00, 0x76 };  // 0x76 = H
 
+  sht30.get();
   display.setSegments(data);
   tempdisplay = sht30.humidity * 10;
   display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-
+  /*
+  t_displayHumidity.stop(timerID);  
+  timerID = t_displayTemperature.after(DISPLAYTIME, displayTemperature);
+  Serial.print("Call Temperature Display : ");
+  Serial.println(timerID);
+  */
 }
+
+
 
 void displayTemperature()
 {
-    float tempdisplay;
-    uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };  // //  gfedcba 00111001 = 0011 1001 = 0x39 = C
+  float tempdisplay;
+  uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };  // //  gfedcba 00111001 = 0011 1001 = 0x39 = C
 
-    display.setSegments(data);
-    tempdisplay = sht30.cTemp * 10;
-    display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
-    blynkTimer.setTimeout(2000, displayHumidity);
+  sht30.get();
+  display.setSegments(data);
+  tempdisplay = sht30.cTemp * 10;
+  display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
+    /*
+    if (timerID != -1) {
+      t_displayTemperature.stop(timerID);
+    }
+    
+    timerID = t_displayHumidity.after(DISPLAYTIME, displayHumidity);
+    Serial.print("Call Humidity Display : ");
+    Serial.println(timerID);
+    */
 }
 
 void turnrelay_onoff(uint8_t value)
