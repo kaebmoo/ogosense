@@ -99,6 +99,7 @@ int gauge2Push_reset;
 
 int ledStatus = LOW;             // ledStatus used to set the LED
 const int chipSelect = D8; // SD CARD
+const int CLK = D4; // D6 Set the CLK pin connection to the display
 const int DIO = D3; //Set the DIO pin connection to the display
 
 const int buzzer=D5; //Buzzer control port, default D5
