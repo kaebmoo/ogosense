@@ -28,10 +28,10 @@ SOFTWARE.
 
 #define SOILMOISTURE
 #define BLYNKLOCAL
-<<<<<<< HEAD
-=======
+
+
 // #define BLYNK
->>>>>>> cef55dae2f2ca23fdf23ee0df25590605cf84cf5
+
 
 #include <SPI.h>
 #include <SD.h>
@@ -253,10 +253,10 @@ void setup()
     strcpy(c_writeapikey,  writeAPIKey);
     strcpy(c_readapikey, readAPIKey);
     strcpy(c_auth, auth);
-    ltoa(channelID, c_channelid, 10);    
+    ltoa(channelID, c_channelid, 10);
   }
   autoWifiConnect();
-  
+
   // web update OTA
   String host_update_name;
   host_update_name = "ogoswitch-"+String(ESP.getChipId());
@@ -307,18 +307,12 @@ void setup()
   digitalWrite(LED, LOW);
   buzzer_sound();
 
-<<<<<<< HEAD
-  blynkTimer.setInterval(DISPLAYTIME, displayTemperature);
-  // #ifdef SOILMOISTURE
-  // blynkTimer.setInterval(5000, soilMoistureSensor);
-  // #endif
-=======
   blynkTimer.setInterval(DISPLAYTIME,   displayTemperature);
-  
+
   #ifdef SOILMOISTURE
   blynkTimer.setInterval(5000, soilMoistureSensor);
   #endif
->>>>>>> cef55dae2f2ca23fdf23ee0df25590605cf84cf5
+
   t_readSensor.every(5000, temp_humi_sensor);
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
   t_checkFirmware.every(86400000L, upintheair);
@@ -563,7 +557,7 @@ void soilMoistureSensor()
   if (soilMoisture > 500) {
     Serial.println("High Moisture");
     if (digitalRead(RELAY1) == LOW) {
-      Serial.println("Soil Moisture: Turn Relay On");      
+      Serial.println("Soil Moisture: Turn Relay On");
       turnrelay_onoff(HIGH);
       delay(300);
       Blynk.virtualWrite(V1, 1);
@@ -582,7 +576,7 @@ void soilMoistureSensor()
   else {
     Serial.println("Low Moisture");
     if (digitalRead(RELAY1) == HIGH) {
-      Serial.println("Soil Moisture: Turn Relay Off");      
+      Serial.println("Soil Moisture: Turn Relay Off");
       turnrelay_onoff(LOW);
       delay(300);
       Blynk.virtualWrite(V1, 0);
