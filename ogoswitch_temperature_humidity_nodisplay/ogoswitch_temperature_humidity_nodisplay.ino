@@ -27,6 +27,7 @@ SOFTWARE.
 // #define BLYNK_PRINT Serial
 
 #define SOILMOISTURE
+#define BLYNKLOCAL
 
 #include <SPI.h>
 #include <SD.h>
@@ -212,7 +213,7 @@ void setup()
   microgear.on(CONNECTED,onConnected);
   microgear.setEEPROMOffset(512);
 
-  
+
   ALIAS = "ogosense-"+String(ESP.getChipId());
   Serial.print(me);
   Serial.print("\t");
@@ -307,9 +308,9 @@ void setup()
   buzzer_sound();
 
   blynkTimer.setInterval(DISPLAYTIME, displayTemperature);
-  #ifdef SOILMOISTURE
-  blynkTimer.setInterval(5000, soilMoistureSensor);
-  #endif
+  // #ifdef SOILMOISTURE
+  // blynkTimer.setInterval(5000, soilMoistureSensor);
+  // #endif
   t_readSensor.every(5000, temp_humi_sensor);
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
   t_checkFirmware.every(86400000L, upintheair);
@@ -322,8 +323,7 @@ void loop() {
   httpServer.handleClient();
   blink();  // flash LED
 
-  // read data from sensor and action by condition in options, COOL, MOISTURE
-  // temp_humi_sensor() every x sec.
+
   sendThingSpeak();
 
   /** netpie connect **/
@@ -361,7 +361,7 @@ void auto_wifi_connect()
   WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
   WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
   WiFiManagerParameter custom_h_range("h_range", "humidity range : 0-50", h_range, 6);
-  WiFiManagerParameter custom_c_options("c_options", "0,1,2 : 0-Humidity 1-Temperature 2-Both", c_options, 6);
+  WiFiManagerParameter custom_c_options("c_options", "0,1,2,3 : 0-Humidity 1-Temperature 2-Both 3-Soil Moisture", c_options, 6);
   WiFiManagerParameter custom_c_cool("c_cool", "0,1 : 0-Heat 1-Cool", c_cool, 6);
   WiFiManagerParameter custom_c_moisture("c_moisture", "0,1 : 0-Dehumidifier 1-Moisture", c_moisture, 6);
   WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
@@ -690,9 +690,9 @@ void soilMoistureSensor()
   soilMoisture = analogRead(analogReadPin);
   Serial.print("Analog Read : ");
   Serial.println(soilMoisture);
-  
-  if (soilMoisture > 500) {       
-    Serial.println("High Moisture"); 
+
+  if (soilMoisture > 500) {
+    Serial.println("High Moisture");
     if (digitalRead(RELAY1) == LOW) {
       Serial.println("Soil Moisture: Turn Relay On");
       delay(300);
@@ -701,13 +701,15 @@ void soilMoistureSensor()
       // Blynk.syncVirtual(V1);
       RelayEvent = true;
     }
+    /*
     if (AUTO == true) {
       keepState = 1;
       AUTO = false;
-      Blynk.virtualWrite(V2, 0);  
+      Blynk.virtualWrite(V2, 0);
       led2.off();
     }
-  }  
+    */
+  }
   else {
     Serial.println("Low Moisture");
     if (digitalRead(RELAY1) == HIGH) {
@@ -717,11 +719,13 @@ void soilMoistureSensor()
       Blynk.virtualWrite(V1, 0);
       RelayEvent = false;
     }
+    /*
     if (keepState == 1) {
       AUTO = true;
-      Blynk.virtualWrite(V2, 1);  
+      Blynk.virtualWrite(V2, 1);
       keepState = 0;
     }
+    */
   }
 }
 #endif
@@ -850,7 +854,7 @@ void temp_humi_sensor()
 
         }
       }
-      else {
+      else if (options == 0) {
         Serial.println("Option: Humidity");
         if (humion == true) {
           if (RelayEvent == false) {
@@ -877,6 +881,10 @@ void temp_humi_sensor()
               Serial.println("Timer Delay Start");
           }
         }
+      }
+      else if (options == 3) {
+        soilMoistureSensor();
+        Serial.println("Soil Moisture Mode");
       }
 
       Serial.print("tempon = ");
