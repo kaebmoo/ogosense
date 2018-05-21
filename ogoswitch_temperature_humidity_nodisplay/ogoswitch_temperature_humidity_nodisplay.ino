@@ -26,7 +26,7 @@ SOFTWARE.
 // #define BLYNK_DEBUG // Optional, this enables lots of prints
 // #define BLYNK_PRINT Serial
 
-#define SOILMOISTURE
+// #define SOILMOISTURE
 #define BLYNKLOCAL
 
 
@@ -736,8 +736,10 @@ void temp_humi_sensor()
         }
       }
       else if (options == 3) {
+        #ifdef SOILMOISTURE
         soilMoistureSensor();
         Serial.println("Soil Moisture Mode");
+        #endif
       }
 
       Serial.print("tempon = ");
