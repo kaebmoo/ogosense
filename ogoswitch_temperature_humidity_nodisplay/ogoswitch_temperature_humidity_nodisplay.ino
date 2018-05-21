@@ -26,12 +26,18 @@ SOFTWARE.
 // #define BLYNK_DEBUG // Optional, this enables lots of prints
 // #define BLYNK_PRINT Serial
 
+#define MATRIXLED
 // #define SOILMOISTURE
 #define BLYNKLOCAL
 
 
 // #define BLYNK
 
+#ifdef MATRIXLED
+#include <MLEDScroll.h>
+
+MLEDScroll matrix;
+#endif
 
 #include <SPI.h>
 #include <SD.h>
@@ -213,6 +219,17 @@ void setup()
 
   // put your setup code here, to run once:
 
+  #ifdef MATRIXLED
+  matrix.begin();
+  matrix.setIntensity(1);
+  matrix.message("Starting...", 50);
+  while (matrix.scroll()!=SCROLL_ENDED) {
+    yield();
+  }
+
+  matrix.clear();
+  #endif
+  
   #ifdef NETPIE
   /* setup netpie call back */
   microgear.on(MESSAGE,onMsghandler);
@@ -832,6 +849,7 @@ void displayHumidity()
 {
   float tempdisplay;
   uint8_t data[] = { 0x00, 0x00, 0x00, 0x76 };  // 0x76 = H
+  static char outstring[8];
 
   sht30.get();
   display.setSegments(data);
@@ -843,6 +861,17 @@ void displayHumidity()
   Serial.print("Call Temperature Display : ");
   Serial.println(timerID);
   */
+  #ifdef MATRIXLED
+  // dtostrf(sht30.humidity, 4, 2, outstring);
+  memset(outstring, '\0', sizeof(outstring));
+  strcpy(outstring, String(sht30.humidity, 0).c_str());
+  strcat(outstring, "%");
+  matrix.message(outstring, 100);
+  while (matrix.scroll()!=SCROLL_ENDED) {
+    yield();
+  }
+  matrix.clear();
+  #endif
 }
 
 
@@ -851,6 +880,7 @@ void displayTemperature()
 {
   float tempdisplay;
   uint8_t data[] = { 0x00, 0x00, 0x00, 0x39 };  // //  gfedcba 00111001 = 0011 1001 = 0x39 = C
+  static char outstring[8];
 
   sht30.get();
   display.setSegments(data);
@@ -865,6 +895,17 @@ void displayTemperature()
     Serial.print("Call Humidity Display : ");
     Serial.println(timerID);
     */
+    #ifdef MATRIXLED
+    // dtostrf(sht30.cTemp, 4, 2, outstring);
+    memset(outstring, '\0', sizeof(outstring));
+    strcpy(outstring, String(sht30.cTemp, 1).c_str());
+    strcat(outstring, "C");
+    matrix.message(outstring, 100);
+    while (matrix.scroll()!=SCROLL_ENDED) {
+      yield();
+    }
+    matrix.clear();
+    #endif
 }
 
 void turnrelay_onoff(uint8_t value)
