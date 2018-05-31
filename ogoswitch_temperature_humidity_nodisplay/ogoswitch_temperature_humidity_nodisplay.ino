@@ -26,11 +26,10 @@ SOFTWARE.
 // #define BLYNK_DEBUG // Optional, this enables lots of prints
 // #define BLYNK_PRINT Serial
 
+#define SLEEP
 #define MATRIXLED
 // #define SOILMOISTURE
 #define BLYNKLOCAL
-
-
 // #define BLYNK
 
 #ifdef MATRIXLED
@@ -103,18 +102,23 @@ WidgetLED led2(11); // Auto status
 int gauge1Push_reset;
 int gauge2Push_reset;
 
-int ledStatus = LOW;             // ledStatus used to set the LED
-const int chipSelect = D8; // SD CARD
-const int CLK = D6; // D6 Set the CLK pin connection to the display
-const int DIO = D3; //Set the DIO pin connection to the display
-
-const int buzzer=D5; //Buzzer control port, default D5
-const int analogReadPin = A0;               // read for set options use R for voltage divide
+int ledStatus = LOW;                        // ledStatus used to set the LED
+const int chipSelect = D8;                  // SD CARD
+#ifdef MATRIXLED
+const int RELAY1 = D6;                      // ouput for control relay
+#else
 const int RELAY1 = D7;                      // ouput for control relay
-const int LED = D4;                         // output for LED (toggle) buildin LED board
-// const int RELAY2 = D7;                      // ouput for second relay
+const int CLK = D6;                         // D6 Set the CLK pin connection to the display 7 segment
+const int DIO = D3;                         // Set the DIO pin connection to the display 7 segment
+TM1637Display display(CLK, DIO);            //set up the 4-Digit Display.
+#endif
 
-TM1637Display display(CLK, DIO); //set up the 4-Digit Display.
+
+const int buzzer=D5;                        // Buzzer control port, default D5
+const int analogReadPin = A0;               // read for set options use R for voltage divide
+const int LED = D4;                         // output for LED (toggle) buildin LED board
+// const int RELAY2 = D7;                   // ouput for second relay
+
 SHT3X sht30(0x45);                          // address sensor
 
 float maxtemp = TEMPERATURE_SETPOINT;
@@ -195,6 +199,10 @@ const int MAXRETRY=4; // 0 - 4
 
 const unsigned long DISPLAYTIME = 5000L;  // milliseconds display time temperature and humidity
 // int timerID = -1;
+#ifdef SLEEP
+// sleep for this many seconds
+const int sleepSeconds = 300;
+#endif
 
 void setup()
 {
@@ -213,23 +221,26 @@ void setup()
   pinMode(RELAY1, OUTPUT);
   digitalWrite(RELAY1, LOW);
 
+  #ifndef MATRIXLED
   display.setBrightness(0x0a); //set the diplay to maximum brightness
+  #endif
   // options = analogRead(analogReadPin);
   // Serial.println(options);
 
   // put your setup code here, to run once:
 
   #ifdef MATRIXLED
-  matrix.begin();
-  matrix.setIntensity(1);
-  matrix.message("Starting...", 50);
-  while (matrix.scroll()!=SCROLL_ENDED) {
-    yield();
-  }
-
-  matrix.clear();
+    matrix.begin();
+    matrix.setIntensity(1);
+    #ifndef SLEEP
+    matrix.message("Starting...", 50);
+    while (matrix.scroll()!=SCROLL_ENDED) {
+      yield();
+    }
+    matrix.clear();
+    #endif
   #endif
-  
+
   #ifdef NETPIE
   /* setup netpie call back */
   microgear.on(MESSAGE,onMsghandler);
@@ -326,18 +337,30 @@ void setup()
   digitalWrite(LED, LOW);
   buzzer_sound();
 
-  
+
   // t_displayTemperature.every(DISPLAYTIME, displayTemperature);
 
   #ifdef SOILMOISTURE
   blynkTimer.setInterval(5000, soilMoistureSensor);
   #endif
 
-  t_readSensor.every(5000, temp_humi_sensor);
-  checkConnectionTimer.setInterval(60000L, checkBlynkConnection);
-  t_checkFirmware.every(86400000L, upintheair);
+  t_readSensor.every(5000, temp_humi_sensor);                       // read sensor data and make decision
+  blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
+  checkConnectionTimer.setInterval(60000L, checkBlynkConnection);   // check blynk connection
+  t_checkFirmware.every(86400000L, upintheair);                     // check firmware update every 24 hrs
   upintheair();
+
+  #ifdef SLEEP
+  sendThingSpeak();
+  temp_humi_sensor();
+  displayHumidity();
+  Serial.println("I'm going to sleep.");
+  delay(15000);
+  Serial.println("Goodnight folks!");
+  ESP.deepSleep(sleepSeconds * 1000000);
+  #else
   displayTemperature();
+  #endif
 }
 
 void loop() {
@@ -346,7 +369,7 @@ void loop() {
   blink();  // flash LED
 
 
-  sendThingSpeak();
+  // sendThingSpeak();
 
   /** netpie connect **/
   #ifdef NETPIE
@@ -852,11 +875,13 @@ void displayHumidity()
   static char outstring[8];
 
   sht30.get();
+  #ifndef MATRIXLED
   display.setSegments(data);
   tempdisplay = sht30.humidity * 10;
   display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
+  #endif
   /*
-  t_displayHumidity.stop(timerID);  
+  t_displayHumidity.stop(timerID);
   timerID = t_displayTemperature.after(DISPLAYTIME, displayTemperature);
   Serial.print("Call Temperature Display : ");
   Serial.println(timerID);
@@ -883,14 +908,16 @@ void displayTemperature()
   static char outstring[8];
 
   sht30.get();
+  #ifndef MATRIXLED
   display.setSegments(data);
   tempdisplay = sht30.cTemp * 10;
   display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
+  #endif
     /*
     if (timerID != -1) {
       t_displayTemperature.stop(timerID);
     }
-    
+
     timerID = t_displayHumidity.after(DISPLAYTIME, displayHumidity);
     Serial.print("Call Humidity Display : ");
     Serial.println(timerID);
@@ -1106,10 +1133,10 @@ void sendThingSpeak()
   float celsiusTemperature = 0;
   float rhHumidity = 0;
   // Only update if posting time is exceeded
-  unsigned long currentMillis = millis();
+  // unsigned long currentMillis = millis();
 
-  if (currentMillis - lastUpdateTime >=  postingInterval) {
-    lastUpdateTime = currentMillis;
+  // if (currentMillis - lastUpdateTime >=  postingInterval) {
+    // lastUpdateTime = currentMillis;
 
     if(sht30.get()==0) {
       fahrenheitTemperature = sht30.fTemp;
@@ -1134,7 +1161,7 @@ void sendThingSpeak()
     Serial.println(writeSuccess);
     Serial.println();
 
-  }
+  // }
 }
 
 #ifdef NETPIE
