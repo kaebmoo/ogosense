@@ -446,7 +446,13 @@ void autoWifiConnect()
   //or use this for auto generated name ESP + ChipID
   //wifiManager.autoConnect();
 
+  #ifdef SLEEP
+  wifiManager.setTimeout(30);
+  #else
   wifiManager.setTimeout(300);
+  #endif
+  
+  
   APName = "ogoSense-"+String(ESP.getChipId());
   if(!wifiManager.autoConnect(APName.c_str()) ) {
     Serial.println("failed to connect and hit timeout");
