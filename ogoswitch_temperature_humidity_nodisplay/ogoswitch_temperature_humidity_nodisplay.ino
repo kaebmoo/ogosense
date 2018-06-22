@@ -343,6 +343,8 @@ void setup()
   #ifdef SOILMOISTURE
   blynkTimer.setInterval(5000, soilMoistureSensor);
   #endif
+  
+  
 
   t_readSensor.every(5000, temp_humi_sensor);                       // read sensor data and make decision
   blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
@@ -354,6 +356,7 @@ void setup()
   sendThingSpeak();
   temp_humi_sensor();
   displayHumidity();
+  checkBattery();
   Serial.println("I'm going to sleep.");
   delay(15000);
   Serial.println("Goodnight folks!");
@@ -592,6 +595,24 @@ void OnceOnlyTask1()
 void OnceOnlyTask2()
 {
   blynkTimer.restartTimer(gauge2Push_reset);
+}
+
+void checkBattery()
+{
+  unsigned int raw = 0;
+  float volt = 0.0;
+
+  raw = analogRead(A0);
+  volt = raw/1023.0;
+  volt = volt * 4.2;
+
+  // String v = String(volt);
+  Serial.print("Battery voltage: ");
+  Serial.println(volt);
+  ThingSpeak.setField(6, volt);
+  int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
+  Serial.println(writeSuccess);
+  Serial.println();
 }
 
 #ifdef SOILMOISTURE
