@@ -603,8 +603,10 @@ void checkBattery()
   float volt = 0.0;
 
   raw = analogRead(A0);
-  volt = raw/1023.0;
-  volt = volt * 4.2;
+  volt = raw * (3.7 / 1023.0);
+  // volt = volt * 4.2;
+  Serial.print("Analog read: ");
+  Serial.println(raw);
 
   // String v = String(volt);
   Serial.print("Battery voltage: ");
