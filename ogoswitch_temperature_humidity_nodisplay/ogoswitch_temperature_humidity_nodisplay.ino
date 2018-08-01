@@ -78,6 +78,8 @@ const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
   String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
 #elif ARDUINO_ESP8266_WEMOS_D1MINILITE
   String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minilite";
+#elif ARDUINO_ESP8266_WEMOS_D1MINIPRO
+  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minipro";
 #endif
 
 
@@ -175,7 +177,7 @@ int ledState = LOW;
 unsigned long previousMillis = 0;
 
 const unsigned long onPeriod = 60L * 60L * 1000L;     // ON relay period minute * second * milli second
-const unsigned long standbyPeriod = 60L * 1000L;      // delay start timer for relay
+const unsigned long standbyPeriod = 300L * 1000L;      // delay start timer for relay
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -450,7 +452,7 @@ void autoWifiConnect()
   //wifiManager.autoConnect();
 
   #ifdef SLEEP
-  wifiManager.setTimeout(30);
+  wifiManager.setTimeout(60);
   #else
   wifiManager.setTimeout(300);
   #endif
@@ -466,6 +468,8 @@ void autoWifiConnect()
   }
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
+  Serial.print("MAC: ");
+  Serial.println(WiFi.macAddress());
 
   if (temperature_setpoint > 100 || temperature_setpoint < 0) {
     temperature_setpoint = TEMPERATURE_SETPOINT;
