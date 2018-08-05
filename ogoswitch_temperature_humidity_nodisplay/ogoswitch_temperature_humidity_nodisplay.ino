@@ -345,8 +345,8 @@ void setup()
   #ifdef SOILMOISTURE
   blynkTimer.setInterval(5000, soilMoistureSensor);
   #endif
-  
-  
+
+
 
   t_readSensor.every(5000, temp_humi_sensor);                       // read sensor data and make decision
   blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
@@ -358,7 +358,7 @@ void setup()
   sendThingSpeak();
   temp_humi_sensor();
   displayHumidity();
-  checkBattery();
+  // checkBattery();
   Serial.println("I'm going to sleep.");
   delay(15000);
   Serial.println("Goodnight folks!");
@@ -456,8 +456,8 @@ void autoWifiConnect()
   #else
   wifiManager.setTimeout(300);
   #endif
-  
-  
+
+
   APName = "ogoSense-"+String(ESP.getChipId());
   if(!wifiManager.autoConnect(APName.c_str()) ) {
     Serial.println("failed to connect and hit timeout");
@@ -601,7 +601,7 @@ void OnceOnlyTask2()
   blynkTimer.restartTimer(gauge2Push_reset);
 }
 
-void checkBattery()
+float checkBattery()
 {
   unsigned int raw = 0;
   float volt = 0.0;
@@ -615,10 +615,9 @@ void checkBattery()
   // String v = String(volt);
   Serial.print("Battery voltage: ");
   Serial.println(volt);
-  ThingSpeak.setField(6, volt);
-  int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
-  Serial.println(writeSuccess);
-  Serial.println();
+
+  return(volt);
+
 }
 
 #ifdef SOILMOISTURE
@@ -1165,6 +1164,7 @@ void sendThingSpeak()
   float fahrenheitTemperature = 0;
   float celsiusTemperature = 0;
   float rhHumidity = 0;
+  float volt;
   // Only update if posting time is exceeded
   // unsigned long currentMillis = millis();
 
@@ -1190,6 +1190,11 @@ void sendThingSpeak()
     ThingSpeak.setField( 3, digitalRead(RELAY1));
     ThingSpeak.setField( 4, (float) freeheap );
     ThingSpeak.setField( 5, blynkConnectedResult);
+    #ifdef SLEEP
+      volt = checkBattery();
+      ThingSpeak.setField(6, volt);
+    #endif
+
     int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
     Serial.println(writeSuccess);
     Serial.println();
