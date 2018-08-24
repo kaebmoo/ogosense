@@ -126,7 +126,7 @@ void setup(){
   pixels.show();
 
   ThingSpeak.begin( wifiClient );
-  timer.every(5000, readLightLevel);
+  timer.every(60000, readLightLevel);
 }
 
 
