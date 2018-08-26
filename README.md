@@ -1,4 +1,4 @@
-# ogohospital
+# ogoSense
 
 
 smart sensor
