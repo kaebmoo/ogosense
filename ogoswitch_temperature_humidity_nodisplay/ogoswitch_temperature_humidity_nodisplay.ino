@@ -26,8 +26,8 @@ SOFTWARE.
 // #define BLYNK_DEBUG // Optional, this enables lots of prints
 // #define BLYNK_PRINT Serial
 
-#define SLEEP
-#define MATRIXLED
+// #define SLEEP
+// #define MATRIXLED
 // #define SOILMOISTURE
 #define BLYNKLOCAL
 // #define BLYNK
@@ -308,11 +308,12 @@ void setup()
 
   #ifdef BLYNKLOCAL
   Blynk.config(auth, "blynk.ogonan.com", 80);
-  #else
+  #endif
+  #ifdef BLYNK
   Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
   #endif
 
-
+  #if defined(BLYNKLOCAL) || defined(BLYNK)
   blynkConnectedResult = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
   Serial.print("Blynk connect : ");
   Serial.println(blynkConnectedResult);
@@ -322,6 +323,7 @@ void setup()
   else {
     Serial.println("Not connected to Blynk server");
   }
+  #endif
 
 
   // Setup a function to be called every second
@@ -350,7 +352,9 @@ void setup()
 
   t_readSensor.every(5000, temp_humi_sensor);                       // read sensor data and make decision
   blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
+  #if defined(BLYNKLOCAL) || defined(BLYNK)
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);   // check blynk connection
+  #endif
   t_checkFirmware.every(86400000L, upintheair);                     // check firmware update every 24 hrs
   upintheair();
 
@@ -389,9 +393,11 @@ void loop() {
   }
   #endif
 
+  #if defined(BLYNKLOCAL) || defined(BLYNK)
   if (Blynk.connected()) {
     Blynk.run();
   }
+  #endif
 
   blynkTimer.run();
   checkConnectionTimer.run();
