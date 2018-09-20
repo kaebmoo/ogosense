@@ -29,6 +29,7 @@
 #include <ir_Gree.h>
 #include <ir_Haier.h>
 #include <ir_Kelvinator.h>
+#include <ir_LG.h>
 #include <ir_Midea.h>
 #include <ir_Toshiba.h>
 #endif  // DECODE_AC
@@ -210,4 +211,5 @@ void loop() {
     yield();  // Feed the WDT (again)
   }
 }
+
 
