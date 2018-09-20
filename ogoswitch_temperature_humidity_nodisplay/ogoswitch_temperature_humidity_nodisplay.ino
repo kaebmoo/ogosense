@@ -22,6 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/*
+ * Hardware
+ * Wemos D1 mini, Pro
+ * SHT30 Shield
+ * Relay Shield
+ *
+ *
+ */
+
 /* Comment this out to disable prints and save space */
 // #define BLYNK_DEBUG // Optional, this enables lots of prints
 // #define BLYNK_PRINT Serial
@@ -89,14 +98,13 @@ char thingSpeakAddress[] = "api.thingspeak.com";
 unsigned long channelID = 360709;
 char *readAPIKey = "GNZ8WEU763Z5DUEA";
 char *writeAPIKey = "8M07EYX8NPCD9V8U";
-const unsigned long postingInterval = 60L * 1000L;        // 60 seconds
-
-
-long lastUpdateTime = 0;
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
 char auth[] = "27092c0fc50343bc917a97c755012c9b";
+bool blynkConnectedResult = false;
+int blynkreconnect = 0;
+
 
 WidgetLED led1(10); // On led
 WidgetLED led2(11); // Auto status
@@ -106,22 +114,23 @@ int gauge2Push_reset;
 
 int ledStatus = LOW;                        // ledStatus used to set the LED
 const int chipSelect = D8;                  // SD CARD
+
 #ifdef MATRIXLED
-const int RELAY1 = D6;                      // ouput for control relay
+  const int RELAY1 = D6;                      // ouput for control relay
 #else
-const int RELAY1 = D7;                      // ouput for control relay
-const int CLK = D6;                         // D6 Set the CLK pin connection to the display 7 segment
-const int DIO = D3;                         // Set the DIO pin connection to the display 7 segment
-TM1637Display display(CLK, DIO);            //set up the 4-Digit Display.
+  const int RELAY1 = D7;                      // ouput for control relay // const int RELAY2 = D7;                   // ouput for second relay
+  const int CLK = D6;                         // D6 Set the CLK pin connection to the display 7 segment
+  const int DIO = D3;                         // Set the DIO pin connection to the display 7 segment
+  TM1637Display display(CLK, DIO);            //set up the 4-Digit Display.
 #endif
 
 
 const int buzzer=D5;                        // Buzzer control port, default D5
 const int analogReadPin = A0;               // read for set options use R for voltage divide
 const int LED = D4;                         // output for LED (toggle) buildin LED board
-// const int RELAY2 = D7;                   // ouput for second relay
 
-SHT3X sht30(0x45);                          // address sensor
+
+
 
 float maxtemp = TEMPERATURE_SETPOINT;
 float mintemp = TEMPERATURE_SETPOINT - TEMPERATURE_RANGE;
@@ -149,62 +158,42 @@ char c_channelid[8] = "";       // channel id thingspeak
 
 // SHT30 -40 - 125 C ; 0.2-0.6 +-
 
-int SAVE = 6550;      // Configuration save : if 6550 = saved
-int COOL = 1;        // true > set point Cool mode, false < set point = HEAT mode
-int MOISTURE = 0;   // true < set point moisture mode ; false > set point Dehumidifier mode
+int SAVE = 6550;            // Configuration save : if 6550 = saved
+int COOL = 1;               // true > set point Cool mode, false < set point = HEAT mode
+int MOISTURE = 0;           // true < set point moisture mode ; false > set point Dehumidifier mode
 boolean tempon = false;     // flag ON/OFF
 boolean humion = false;     // flag ON/OFF
-boolean AUTO = true;       // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
-
+boolean AUTO = true;        // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
 int options = 0;            // option : 0 = humidity only, 1 = temperature only, 2 = temperature & humidiy
 
 
 WiFiClient client;
-#ifdef NETPIE
-#define APPID   "OgoSense"                  // application id from netpie
-#define KEY     "sYZknE19LHxr1zJ"           // key from netpie
-#define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
+SHT3X sht30(0x45);                          // address sensor
 
-String ALIAS = "ogosense-0000";              // alias name netpie
-char *me = "/ogosense/0000000";                  // topic set for sensor box
-char *mystatus = "/ogosense/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
-
-MicroGear microgear(client);
-#endif
 
 const long interval = 1000;
 int ledState = LOW;
 unsigned long previousMillis = 0;
 
-const unsigned long onPeriod = 60L * 60L * 1000L;     // ON relay period minute * second * milli second
-const unsigned long standbyPeriod = 300L * 1000L;      // delay start timer for relay
+const unsigned long onPeriod = 60L * 60L * 1000L;       // ON relay period minute * second * milli second
+const unsigned long standbyPeriod = 300L * 1000L;       // delay start timer for relay
 
-//flag for saving data
+// flag for saving data
 bool shouldSaveConfig = false;
 
 BlynkTimer blynkTimer, checkConnectionTimer;
 Timer t_relay, t_delayStart, t_readSensor, t_checkFirmware;         // timer for ON period and delay start
-// Timer t_displayTemperature, t_displayHumidity;
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
 
-bool blynkConnectedResult = false;
-int blynkreconnect = 0;
-
-const int MAXRETRY=4; // 0 - 4
-#define BLYNK_GREEN     "#23C48E"
-#define BLYNK_BLUE      "#04C0F8"
-#define BLYNK_YELLOW    "#ED9D00"
-#define BLYNK_RED       "#D3435C"
-#define BLYNK_DARK_BLUE "#5F7CD8"
-
-const unsigned long DISPLAYTIME = 5000L;  // milliseconds display time temperature and humidity
-// int timerID = -1;
 #ifdef SLEEP
-// sleep for this many seconds
-const int sleepSeconds = 300;
+  // sleep for this many seconds
+  const int sleepSeconds = 300;
 #endif
+
+
+
 
 void setup()
 {
@@ -342,25 +331,23 @@ void setup()
   buzzer_sound();
 
 
-  // t_displayTemperature.every(DISPLAYTIME, displayTemperature);
-
   #ifdef SOILMOISTURE
   blynkTimer.setInterval(5000, soilMoistureSensor);
   #endif
 
 
 
-  t_readSensor.every(5000, temp_humi_sensor);                       // read sensor data and make decision
+  t_readSensor.every(5000, readSensor);                       // read sensor data and make decision
   blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
   #if defined(BLYNKLOCAL) || defined(BLYNK)
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);   // check blynk connection
   #endif
-  t_checkFirmware.every(86400000L, upintheair);                     // check firmware update every 24 hrs
-  upintheair();
+  t_checkFirmware.every(86400000L, upintheAir);                     // check firmware update every 24 hrs
+  upintheAir();
 
   #ifdef SLEEP
   sendThingSpeak();
-  temp_humi_sensor();
+  readSensor();
   displayHumidity();
   // checkBattery();
   Serial.println("I'm going to sleep.");
@@ -631,17 +618,18 @@ int keepState = 0;
 
 void soilMoistureSensor()
 {
-  int soilMoisture;
+  int _soilMoisture;
 
-  soilMoisture = analogRead(analogReadPin);
+  _soilMoisture = analogRead(analogReadPin);
   Serial.print("Analog Read : ");
-  Serial.println(soilMoisture);
+  Serial.println(_soilMoisture);
 
-  if (soilMoisture > 500) {
+  if (_soilMoisture > soilMoistureLevel) {  // soilMoistureLevel define in ogoswitch.h, default = 500
     Serial.println("High Moisture");
     if (digitalRead(RELAY1) == LOW) {
       Serial.println("Soil Moisture: Turn Relay On");
-      turnrelay_onoff(HIGH);
+      // turnrelay_onoff(HIGH);
+      turnRelayOn();
       delay(300);
       Blynk.virtualWrite(V1, 1);
       // Blynk.syncVirtual(V1);
@@ -652,7 +640,8 @@ void soilMoistureSensor()
     Serial.println("Low Moisture");
     if (digitalRead(RELAY1) == HIGH) {
       Serial.println("Soil Moisture: Turn Relay Off");
-      turnrelay_onoff(LOW);
+      // turnrelay_onoff(LOW);
+      turnRelayOff();
       delay(300);
       Blynk.virtualWrite(V1, 0);
       RelayEvent = false;
@@ -661,8 +650,18 @@ void soilMoistureSensor()
 }
 #endif
 
-void temp_humi_sensor()
+void readSensor()
 {
+  /*
+   *  read data from temperature & humidity sensor 
+   *  set action by options
+   *  options:
+   *  3 = soil moisture 
+   *  2 = temperature & humidity
+   *  1 = temperature
+   *  0 = humidity
+   * 
+  */
   int humidity_sensor_value;
 
   Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
@@ -735,8 +734,8 @@ void temp_humi_sensor()
             afterStart = t_relay.after(onPeriod, turnoff);
             Serial.println("On Timer Start.");
             RelayEvent = true;
-            turnrelay_onoff(HIGH);
-
+            // turnrelay_onoff(HIGH);
+            turnRelayOn();
           }
         }
         else if (tempon == false && humion == false) {
@@ -746,7 +745,8 @@ void temp_humi_sensor()
           }
           Serial.println("OFF");
           if (digitalRead(RELAY1) == HIGH) {
-            turnrelay_onoff(LOW);
+            // turnrelay_onoff(LOW);
+            turnRelayOff();
           }
 
           // delay start
@@ -763,8 +763,8 @@ void temp_humi_sensor()
             afterStart = t_relay.after(onPeriod, turnoff);
             Serial.println("On Timer Start.");
             RelayEvent = true;
-            turnrelay_onoff(HIGH);
-
+            // turnrelay_onoff(HIGH);
+            turnRelayOn();
           }
         }
         else if (tempon == false) {
@@ -774,7 +774,8 @@ void temp_humi_sensor()
           }
           Serial.println("OFF");
           if (digitalRead(RELAY1) == HIGH) {
-            turnrelay_onoff(LOW);
+            // turnrelay_onoff(LOW);
+            turnRelayOff();
           }
 
           // delay start
@@ -792,8 +793,8 @@ void temp_humi_sensor()
             afterStart = t_relay.after(onPeriod, turnoff);
             Serial.println("On Timer Start.");
             RelayEvent = true;
-            turnrelay_onoff(HIGH);
-
+            // turnrelay_onoff(HIGH);
+            turnRelayOn();
           }
         }
         else if (humion == false) {
@@ -803,7 +804,8 @@ void temp_humi_sensor()
           }
           Serial.println("OFF");
           if (digitalRead(RELAY1) == HIGH) {
-            turnrelay_onoff(LOW);
+            // turnrelay_onoff(LOW);
+            turnRelayOff();
           }
 
           // delay start
@@ -850,7 +852,7 @@ void temp_humi_sensor()
   }
 }
 
-void upintheair()
+void upintheAir()
 {
   String fwURL = String( firmwareUrlBase );
   fwURL.concat( firmware_name );
@@ -918,12 +920,7 @@ void displayHumidity()
   tempdisplay = sht30.humidity * 10;
   display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
   #endif
-  /*
-  t_displayHumidity.stop(timerID);
-  timerID = t_displayTemperature.after(DISPLAYTIME, displayTemperature);
-  Serial.print("Call Temperature Display : ");
-  Serial.println(timerID);
-  */
+
   #ifdef MATRIXLED
   // dtostrf(sht30.humidity, 4, 2, outstring);
   memset(outstring, '\0', sizeof(outstring));
@@ -951,15 +948,7 @@ void displayTemperature()
   tempdisplay = sht30.cTemp * 10;
   display.showNumberDecEx(tempdisplay, (0x80 >> 2), true, 3, 0);
   #endif
-    /*
-    if (timerID != -1) {
-      t_displayTemperature.stop(timerID);
-    }
 
-    timerID = t_displayHumidity.after(DISPLAYTIME, displayHumidity);
-    Serial.print("Call Humidity Display : ");
-    Serial.println(timerID);
-    */
     #ifdef MATRIXLED
     // dtostrf(sht30.cTemp, 4, 2, outstring);
     memset(outstring, '\0', sizeof(outstring));
@@ -973,6 +962,27 @@ void displayTemperature()
     #endif
 }
 
+void turnRelayOn()
+{
+  digitalWrite(RELAY1, HIGH);
+  Serial.println("RELAY1 ON");
+  digitalWrite(LED_BUILTIN, LOW);  // turn on
+  led1.on();
+  Blynk.virtualWrite(V1, 1);
+  buzzer_sound();
+}
+
+void turnRelayOff()
+{
+  digitalWrite(RELAY1, LOW);
+  Serial.println("RELAY1 OFF");
+  digitalWrite(LED_BUILTIN, HIGH);  // turn off
+  led1.off();
+  Blynk.virtualWrite(V1, 0);
+  buzzer_sound();
+}
+
+/*
 void turnrelay_onoff(uint8_t value)
 {
     if (value == HIGH) {
@@ -992,12 +1002,14 @@ void turnrelay_onoff(uint8_t value)
       buzzer_sound();
     }
 }
+*/
 
 void turnoff()
 {
   afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
   if (standbyPeriod >= 5000) {
-    turnrelay_onoff(LOW);
+    // turnrelay_onoff(LOW);
+    turnRelayOff();
     Serial.println("Timer Stop: RELAY1 OFF");
   }
   afterStart = -1;
@@ -1099,6 +1111,7 @@ void writeEEPROM(char* buff, int offset, int len) {
     EEPROM.commit();
 }
 
+
 int init_sdcard()
 {
   unsigned long dataSize;
@@ -1150,6 +1163,8 @@ void write_datalogger(String dataString) {
   }
 }
 
+
+
 void blink()
 {
   unsigned long currentMillis = millis();
@@ -1170,12 +1185,7 @@ void sendThingSpeak()
   float fahrenheitTemperature = 0;
   float celsiusTemperature = 0;
   float rhHumidity = 0;
-  float volt;
-  // Only update if posting time is exceeded
-  // unsigned long currentMillis = millis();
 
-  // if (currentMillis - lastUpdateTime >=  postingInterval) {
-    // lastUpdateTime = currentMillis;
 
     if(sht30.get()==0) {
       fahrenheitTemperature = sht30.fTemp;
@@ -1204,8 +1214,6 @@ void sendThingSpeak()
     int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
     Serial.println(writeSuccess);
     Serial.println();
-
-  // }
 }
 
 #ifdef NETPIE
@@ -1242,11 +1250,13 @@ BLYNK_WRITE(V1)
   Serial.println(pinValue);
   if (!AUTO) {
     if (pinValue == 1) {
-      turnrelay_onoff(HIGH);
+      // turnrelay_onoff(HIGH);
+      turnRelayOn();
       RelayEvent = true;
     }
     else {
-      turnrelay_onoff(LOW);
+      // turnrelay_onoff(LOW);
+      turnRelayOff();
       if (afterStart != -1) {
             t_relay.stop(afterStart);
 
