@@ -98,7 +98,7 @@ void setup(){
   Serial.println(WiFi.psk());
   String SSID = WiFi.SSID();
   String PSK = WiFi.psk();
-  WiFi.begin();
+  WiFi.begin("Red", "12345678");
   Serial.print("Connecting");
   Serial.println();
   
@@ -183,5 +183,3 @@ void sendThingSpeak(uint16_t lux)
   Serial.println(writeSuccess);
   Serial.println();
 }
-
-
