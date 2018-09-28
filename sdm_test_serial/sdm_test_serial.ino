@@ -7,18 +7,61 @@
 
 
 #include <SDM.h>
+#include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
+#include <ThingSpeak.h>
+#include <BlynkSimpleEsp8266.h>
+
 
 // SDM<9600> sdm;
 SDM sdm(Serial, 9600, NOT_A_PIN, SERIAL_8N1, false);
 
+// ThingSpeak information
+char thingSpeakAddress[] = "api.thingspeak.com";
+unsigned long channelID = 360709;
+char *readAPIKey = "5S8UD732WGE1UVO7";
+char *writeAPIKey = "D0T6TVCX48SBB9U5";
+
+BlynkTimer blynkTimer;
+
+WiFiClient client;
 
 void setup() {
   pinMode(BUILTIN_LED, OUTPUT);
   digitalWrite(BUILTIN_LED, HIGH);
+
+  
   sdm.begin();
+  
+  WiFi.begin("Red", "12345678");
+  Serial.print("Connecting");
+  Serial.println();
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+    /*
+    if ( digitalRead(TRIGGER_PIN) == LOW ) {
+      ondemandWiFi();
+    }
+    */
+  }
+  Serial.println();
+  Serial.print("Connected, IP address: ");
+  Serial.println(WiFi.localIP()); 
+  
+  ThingSpeak.begin( client );
+  blynkTimer.setInterval(5000L, sendThingSpeak);                   // send data to thingspeak
 }
 
 void loop() {
+  blynkTimer.run();
+  delay(500);
+  digitalWrite(BUILTIN_LED, HIGH);
+  delay(500);
+}
+
+void sendThingSpeak()
+{
   float tmpVol = NAN;
   float tmpAmp = NAN;
   float tmpWat = NAN;
@@ -60,8 +103,15 @@ void loop() {
     Serial.println("kWh");
     
   }
+
   
-  delay(1000);
-  digitalWrite(BUILTIN_LED, HIGH);
-  delay(1000);
+  ThingSpeak.setField( 1, tmpVol );
+  ThingSpeak.setField( 2, tmpAmp );
+  ThingSpeak.setField( 3, tmpWat);
+  ThingSpeak.setField( 4, tmpFre );
+  ThingSpeak.setField( 5, tmpEne);
+
+  int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
+  Serial.println(writeSuccess);
+  Serial.println();
 }
