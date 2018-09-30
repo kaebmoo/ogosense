@@ -50,7 +50,7 @@ void setup() {
   Serial.println(WiFi.localIP()); 
   
   ThingSpeak.begin( client );
-  blynkTimer.setInterval(5000L, sendThingSpeak);                   // send data to thingspeak
+  blynkTimer.setInterval(10000L, sendThingSpeak);                   // send data to thingspeak
 }
 
 void loop() {
@@ -102,16 +102,17 @@ void sendThingSpeak()
     Serial.print(tmpEne);
     Serial.println("kWh");
     
-  }
+  
 
   
-  ThingSpeak.setField( 1, tmpVol );
-  ThingSpeak.setField( 2, tmpAmp );
-  ThingSpeak.setField( 3, tmpWat);
-  ThingSpeak.setField( 4, tmpFre );
-  ThingSpeak.setField( 5, tmpEne);
-
-  int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
-  Serial.println(writeSuccess);
-  Serial.println();
+    ThingSpeak.setField( 1, tmpVol );
+    ThingSpeak.setField( 2, tmpAmp );
+    ThingSpeak.setField( 3, tmpWat);
+    ThingSpeak.setField( 4, tmpFre );
+    ThingSpeak.setField( 5, tmpEne);
+  
+    int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
+    Serial.println(writeSuccess);
+    Serial.println();
+  }
 }
