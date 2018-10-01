@@ -25,6 +25,19 @@ BlynkTimer blynkTimer;
 
 WiFiClient client;
 
+float tmpVol = NAN;
+float tmpAmp = NAN;
+float tmpWat = NAN;
+float tmpFre = NAN;
+float tmpEne = NAN;
+int readCount = 0;
+float voltage = 0.0;
+float amp = 0.0;
+float watt = 0.0;
+float freq = 0.0;
+float energy = 0.0;
+
+
 void setup() {
   pinMode(BUILTIN_LED, OUTPUT);
   digitalWrite(BUILTIN_LED, HIGH);
@@ -50,24 +63,17 @@ void setup() {
   Serial.println(WiFi.localIP()); 
   
   ThingSpeak.begin( client );
-  blynkTimer.setInterval(10000L, sendThingSpeak);                   // send data to thingspeak
+  blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
+  blynkTimer.setInterval(5000L, readMeterData);
 }
 
 void loop() {
   blynkTimer.run();
-  delay(500);
-  digitalWrite(BUILTIN_LED, HIGH);
-  delay(500);
+  
 }
 
-void sendThingSpeak()
+void readMeterData()
 {
-  float tmpVol = NAN;
-  float tmpAmp = NAN;
-  float tmpWat = NAN;
-  float tmpFre = NAN;
-  float tmpEne = NAN;
-  
   tmpVol = sdm.readVal(SDM220T_VOLTAGE);
   delay(50);
   tmpAmp = sdm.readVal(SDM230_CURRENT);
@@ -77,7 +83,6 @@ void sendThingSpeak()
   tmpFre = sdm.readVal(SDM230_FREQUENCY);
   delay(50);
   tmpEne = sdm.readVal(SDM230_TOTAL_ACTIVE_ENERGY);
-  
 
   if (!isnan(tmpVol)) {
     digitalWrite(BUILTIN_LED, LOW);
@@ -101,18 +106,64 @@ void sendThingSpeak()
     Serial.print("Total Energy: ");
     Serial.print(tmpEne);
     Serial.println("kWh");
+    voltage += tmpVol;
+    amp += tmpAmp;
+    watt += tmpWat;
+    freq = tmpFre;
+    energy = tmpEne;
+    readCount++;
+  }
+  delay(500);
+  digitalWrite(BUILTIN_LED, HIGH);
+  delay(500);
+  digitalWrite(BUILTIN_LED, LOW);
+}
+
+
+void sendThingSpeak()
+{
+  if(readCount != 0) {
+    voltage = voltage / readCount;
+    amp = amp / readCount;
+    watt = watt / readCount;    
+  }
+
+    Serial.println();
+    Serial.print("Voltage:   ");
+    Serial.print(voltage);
+    Serial.println("V");
+
+    Serial.print("Current:   ");
+    Serial.print(amp);
+    Serial.println("A");
+
+    Serial.print("Power:     ");
+    Serial.print(watt);
+    Serial.println("W");
+
+    Serial.print("Frequency: ");
+    Serial.print(freq);
+    Serial.println("Hz");
+
+    Serial.print("Total Energy: ");
+    Serial.print(energy);
+    Serial.println("kWh");
     
   
 
   
-    ThingSpeak.setField( 1, tmpVol );
-    ThingSpeak.setField( 2, tmpAmp );
-    ThingSpeak.setField( 3, tmpWat);
-    ThingSpeak.setField( 4, tmpFre );
-    ThingSpeak.setField( 5, tmpEne);
+    ThingSpeak.setField( 1, voltage );
+    ThingSpeak.setField( 2, amp );
+    ThingSpeak.setField( 3, watt);
+    ThingSpeak.setField( 4, freq );
+    ThingSpeak.setField( 5, energy);
   
     int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
     Serial.println(writeSuccess);
     Serial.println();
-  }
+
+    voltage = 0;
+    amp = 0;
+    watt = 0;
+    readCount = 0;
 }
