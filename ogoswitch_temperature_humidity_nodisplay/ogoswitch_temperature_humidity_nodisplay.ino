@@ -25,8 +25,8 @@ SOFTWARE.
 /*
  * Hardware
  * Wemos D1 mini, Pro
- * SHT30 Shield
- * Relay Shield
+ * Wemos SHT30 Shield
+ * Wemos Relay Shield
  *
  *
  */
@@ -38,15 +38,16 @@ SOFTWARE.
 // #define SLEEP
 // #define MATRIXLED
 // #define SOILMOISTURE
+// #define EXTERNALSENSE
 #define BLYNKLOCAL
 // #define BLYNK
 
 #ifdef MATRIXLED
-#include <MLEDScroll.h>
-
-MLEDScroll matrix;
+  #include <MLEDScroll.h>
+  MLEDScroll matrix;
 #endif
 
+#include "ogoswitch.h"
 #include <SPI.h>
 #include <SD.h>
 
@@ -65,7 +66,7 @@ MLEDScroll matrix;
 #include <EEPROM.h>
 #include <Timer.h>
 #ifdef NETPIE
-#include <MicroGear.h>
+  #include <MicroGear.h>
 #endif
 #include <WiFiClient.h>
 #include <ESP8266mDNS.h>
@@ -73,7 +74,6 @@ MLEDScroll matrix;
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
-#include "ogoswitch.h"
 
 const char* host = "ogosense-webupdate";
 const char* update_path = "/firmware";
@@ -224,27 +224,27 @@ void setup()
     matrix.begin();
     matrix.setIntensity(1);
     #ifndef SLEEP
-    matrix.message("Starting...", 50);
-    while (matrix.scroll()!=SCROLL_ENDED) {
-      yield();
-    }
-    matrix.clear();
+      matrix.message("Starting...", 50);
+      while (matrix.scroll()!=SCROLL_ENDED) {
+        yield();
+      }
+      matrix.clear();
     #endif
   #endif
 
   #ifdef NETPIE
-  /* setup netpie call back */
-  microgear.on(MESSAGE,onMsghandler);
-  microgear.on(CONNECTED,onConnected);
-  microgear.setEEPROMOffset(512);
+    /* setup netpie call back */
+    microgear.on(MESSAGE,onMsghandler);
+    microgear.on(CONNECTED,onConnected);
+    microgear.setEEPROMOffset(512);
 
 
-  ALIAS = "ogosense-"+String(ESP.getChipId());
-  Serial.print(me);
-  Serial.print("\t");
-  Serial.print(ALIAS);
-  Serial.print("\t");
-  Serial.println(mystatus);
+    ALIAS = "ogosense-"+String(ESP.getChipId());
+    Serial.print(me);
+    Serial.print("\t");
+    Serial.print(ALIAS);
+    Serial.print("\t");
+    Serial.println(mystatus);
   #endif
 
 
@@ -291,27 +291,27 @@ void setup()
 
   // microgear.useTLS(true);
   #ifdef NETPIE
-  microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
-  microgear.connect(APPID);
+    microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
+    microgear.connect(APPID);
   #endif
 
   #ifdef BLYNKLOCAL
-  Blynk.config(auth, "blynk.ogonan.com", 80);
+    Blynk.config(auth, "blynk.ogonan.com", 80);
   #endif
   #ifdef BLYNK
-  Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
+    Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
   #endif
 
   #if defined(BLYNKLOCAL) || defined(BLYNK)
-  blynkConnectedResult = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
-  Serial.print("Blynk connect : ");
-  Serial.println(blynkConnectedResult);
-  if (blynkConnectedResult) {
-    Serial.println("Connected to Blynk server");
-  }
-  else {
-    Serial.println("Not connected to Blynk server");
-  }
+    blynkConnectedResult = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
+    Serial.print("Blynk connect : ");
+    Serial.println(blynkConnectedResult);
+    if (blynkConnectedResult) {
+      Serial.println("Connected to Blynk server");
+    }
+    else {
+      Serial.println("Not connected to Blynk server");
+    }
   #endif
 
 
@@ -332,7 +332,7 @@ void setup()
 
 
   #ifdef SOILMOISTURE
-  blynkTimer.setInterval(5000, soilMoistureSensor);
+    blynkTimer.setInterval(5000, soilMoistureSensor);
   #endif
 
 
@@ -342,20 +342,21 @@ void setup()
   #if defined(BLYNKLOCAL) || defined(BLYNK)
   checkConnectionTimer.setInterval(60000L, checkBlynkConnection);   // check blynk connection
   #endif
+
   t_checkFirmware.every(86400000L, upintheAir);                     // check firmware update every 24 hrs
   upintheAir();
 
   #ifdef SLEEP
-  sendThingSpeak();
-  readSensor();
-  displayHumidity();
-  // checkBattery();
-  Serial.println("I'm going to sleep.");
-  delay(15000);
-  Serial.println("Goodnight folks!");
-  ESP.deepSleep(sleepSeconds * 1000000);
+    sendThingSpeak();
+    readSensor();
+    displayHumidity();
+    // checkBattery();
+    Serial.println("I'm going to sleep.");
+    delay(15000);
+    Serial.println("Goodnight folks!");
+    ESP.deepSleep(sleepSeconds * 1000000);
   #else
-  displayTemperature();
+    displayTemperature();
   #endif
 }
 
@@ -650,6 +651,31 @@ void soilMoistureSensor()
 }
 #endif
 
+int humidity_sensor_value;
+float temperature_sensor_value, fTemperature;
+
+int getExternalSensor()
+{
+
+  return 0;
+}
+
+int getInternalSensor()
+{
+  if (sht30.get() == 0) {
+    humidity_sensor_value = (int) sht30.humidity;
+    temperature_sensor_value = sht30.cTemp;
+    fTemperature = sht30.fTemp;
+
+    return 0;
+  }
+  else {
+    return 1;
+  }
+
+}
+
+
 void readSensor()
 {
   /*
@@ -662,30 +688,39 @@ void readSensor()
    *  0 = humidity
    *
   */
-  int humidity_sensor_value;
+
+  int sensorStatus;
+
+  #ifdef EXTERNALSENSE
+  sensorStatus = getExternalSensor();
+  #else
+  sensorStatus = getInternalSensor();
+  #endif
 
   Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
   if(AUTO) {
     Serial.print("\tOptions : ");
     Serial.println(options);
 
-    if(sht30.get()==0){
+    if(sensorStatus == 0) {
+
+
       Serial.print("Temperature in Celsius : ");
-      Serial.print(sht30.cTemp);
+      Serial.print(temperature_sensor_value);
       Serial.print("\tset point : ");
       Serial.print(temperature_setpoint);
       Serial.print("\trange : ");
       Serial.println(temperature_range);
       Serial.print("Temperature in Fahrenheit : ");
-      Serial.println(sht30.fTemp);
+      Serial.println(fTemperature);
       Serial.print("Relative Humidity : ");
-      Serial.print(sht30.humidity);
+      Serial.print(humidity_sensor_value);
       Serial.print("\tset point : ");
       Serial.print(humidity_setpoint);
       Serial.print("\trange : ");
       Serial.println(humidity_range);
 
-      humidity_sensor_value = (int) sht30.humidity;
+
 
       if (MOISTURE == 1) {
         if (humidity_sensor_value < humidity_setpoint) {
@@ -707,21 +742,21 @@ void readSensor()
       }
 
       if(COOL == 1) {
-        if (sht30.cTemp > temperature_setpoint) {
+        if (temperature_sensor_value > temperature_setpoint) {
 
           tempon = true;
         }
-        else if (sht30.cTemp < (temperature_setpoint - temperature_range)) {
+        else if (temperature_sensor_value < (temperature_setpoint - temperature_range)) {
 
           tempon = false;
         }
       }
       else if (COOL == 0){
-        if (sht30.cTemp < temperature_setpoint) {
+        if (temperature_sensor_value < temperature_setpoint) {
 
           tempon = true;
         }
-        else if (sht30.cTemp > (temperature_setpoint + temperature_range)) {
+        else if (temperature_sensor_value > (temperature_setpoint + temperature_range)) {
 
           tempon = false;
         }
@@ -836,12 +871,13 @@ void readSensor()
 
 
 
-    }
+    } // if sensor OK
     else
     {
       Serial.println("Sensor Error!");
     }
-  }
+  } // if AUTO
+
   if (ledStatus == LOW) {
     ledStatus = HIGH;
     displayTemperature();
@@ -982,27 +1018,6 @@ void turnRelayOff()
   buzzer_sound();
 }
 
-/*
-void turnrelay_onoff(uint8_t value)
-{
-    if (value == HIGH) {
-      digitalWrite(RELAY1, HIGH);
-      Serial.println("RELAY1 ON");
-      digitalWrite(LED_BUILTIN, LOW);  // turn on
-      led1.on();
-      Blynk.virtualWrite(V1, 1);
-      buzzer_sound();
-    }
-    else if (value == LOW) {
-      digitalWrite(RELAY1, LOW);
-      Serial.println("RELAY1 OFF");
-      digitalWrite(LED_BUILTIN, HIGH);  // turn off
-      led1.off();
-      Blynk.virtualWrite(V1, 0);
-      buzzer_sound();
-    }
-}
-*/
 
 void turnoff()
 {
