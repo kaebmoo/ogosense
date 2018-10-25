@@ -101,7 +101,7 @@ char *writeAPIKey = "8M07EYX8NPCD9V8U";
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
-char auth[] = "27092c0fc50343bc917a97c755012c9b";
+char auth[] = "";
 bool blynkConnectedResult = false;
 int blynkreconnect = 0;
 
@@ -653,14 +653,14 @@ void soilMoistureSensor()
 void readSensor()
 {
   /*
-   *  read data from temperature & humidity sensor 
+   *  read data from temperature & humidity sensor
    *  set action by options
    *  options:
-   *  3 = soil moisture 
+   *  3 = soil moisture
    *  2 = temperature & humidity
    *  1 = temperature
    *  0 = humidity
-   * 
+   *
   */
   int humidity_sensor_value;
 
