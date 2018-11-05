@@ -186,7 +186,7 @@ void readAndSendLightLevel()
   Serial.println(" lx");
 
   sendThingsBoard(lux);
-  sendThingSpeak(lux);
+  sendThingSpeak(lux);  // be careful timeout in sending data to thingspeak
 }
 
 void sendThingsBoard(uint16_t lux)
