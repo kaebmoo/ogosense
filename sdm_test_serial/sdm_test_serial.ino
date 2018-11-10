@@ -7,9 +7,12 @@
 
 
 #include <SDM.h>
-#include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
+// #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
+#include <WiFi.h> // esp32
 #include <ThingSpeak.h>
-#include <BlynkSimpleEsp8266.h>
+// #include <BlynkSimpleEsp8266.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
 
 
 // SDM<9600> sdm;
@@ -37,6 +40,8 @@ float watt = 0.0;
 float freq = 0.0;
 float energy = 0.0;
 
+int BUILTIN_LED = 2;  // ESP32 board
+
 
 void setup() {
   pinMode(BUILTIN_LED, OUTPUT);
@@ -45,7 +50,7 @@ void setup() {
   
   sdm.begin();
   
-  WiFi.begin("Red", "12345678");
+  WiFi.begin("Red1", "12345678");
   Serial.print("Connecting");
   Serial.println();
 
@@ -63,7 +68,7 @@ void setup() {
   Serial.println(WiFi.localIP()); 
   
   ThingSpeak.begin( client );
-  blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
+  // blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
   blynkTimer.setInterval(5000L, readMeterData);
 }
 

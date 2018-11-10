@@ -50,7 +50,7 @@ char thingsboardServer[] = "box.greenwing.email";
 #define SENDINTERVAL  10000  // send data interval time
 
 unsigned long lastSend;
-const int MAXRETRY=30; 
+const int MAXRETRY=30;
 
 /*
 
@@ -129,7 +129,7 @@ void setup(){
   WiFi.begin("Red1", "12345678");
   Serial.print("Connecting");
   Serial.println();
-  
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -172,30 +172,30 @@ void loop() {
     readAndSendLightLevel();
     lastSend = millis();
   }
-  
+
   mqttClient.loop();
 }
 
 void readAndSendLightLevel()
 {
   Serial.println("Collecting ambient light data.");
-  
+
   uint16_t lux = lightMeter.readLightLevel();
   Serial.print("Light: ");
   Serial.print(lux);
   Serial.println(" lx");
 
   sendThingsBoard(lux);
-  sendThingSpeak(lux);  // be careful timeout in sending data to thingspeak
+  // sendThingSpeak(lux);  // be careful timeout in sending data to thingspeak
 }
 
 void sendThingsBoard(uint16_t lux)
 {
   // Just debug messages
   Serial.print( "Sending ambient light : [" );
-  Serial.print( lux ); 
+  Serial.print( lux );
   Serial.print( "]   -> " );
-  
+
   // Prepare a JSON payload string
   String payload = "{";
   payload += "\"lux\":"; payload += lux; payload += ",";
@@ -258,7 +258,7 @@ void setup_mqtt() {
   mqttClient.setCallback(callback);
   if (mqttClient.connect(myRoom, TOKEN, NULL)) {
     // mqttClient.publish(roomStatus,"hello world");
-    
+
     // mqttClient.subscribe(setmaxtemp);
     // mqttClient.subscribe(setmintemp);
     // mqttClient.subscribe(setmaxhumidity);
@@ -310,25 +310,25 @@ void callback(char* topic, byte* payload, unsigned int length) {
     mqttClient.publish(responseTopic.c_str(), get_gpio_status().c_str());
     mqttClient.publish("v1/devices/me/attributes", get_gpio_status().c_str());
   }
-  
+
 }
 
-String get_gpio_status() 
+String get_gpio_status()
 {
   // Prepare gpios JSON payload string
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject& data = jsonBuffer.createObject();
-  
+
   data[String(GPIO0_PIN)] = gpioState[0] ? true : false;
   data[String(GPIO2_PIN)] = gpioState[1] ? true : false;
-  
+
   char payload[256];
   data.printTo(payload, sizeof(payload));
-  
+
   String strPayload = String(payload);
   Serial.print("Get gpio status: ");
   Serial.println(strPayload);
-  
+
   return strPayload;
 }
 
@@ -338,24 +338,24 @@ void set_gpio_status(int pin, boolean enabled) {
     digitalWrite(GPIO0, enabled ? HIGH : LOW);
     // Update GPIOs state
     gpioState[0] = enabled;
-  } 
+  }
   else if (pin == GPIO2_PIN) {
     // Output GPIOs state
     digitalWrite(GPIO2, enabled ? HIGH : LOW);
     // Update GPIOs state
     gpioState[1] = enabled;
   }
-  
+
 }
 
 
 void reconnect() {
   // Loop until we're reconnected
-  
+
 
   while (!mqttClient.connected()) {
     Serial.print("Attempting MQTT connection...");
-    
+
     // Attempt to connect
     #ifdef THINGSBOARD
     if (mqttClient.connect(myRoom, TOKEN, NULL)) {  // connect to thingsboards
@@ -364,12 +364,12 @@ void reconnect() {
     #endif
       Serial.print("connected : ");
       Serial.println(thingsboardServer); // mqtt_server
-      
+
 
 
       // Once connected, publish an announcement...
       // mqttClient.publish(roomStatus, "hello world");
-      
+
     } else {
       Serial.print("failed, reconnecting state = ");
       Serial.print(mqttClient.state());
