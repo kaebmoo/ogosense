@@ -63,8 +63,9 @@ SOFTWARE.
 #define SECRET  "wJOErv6EcU365pnBMpcFLDzcZ" // secret from netpie
 
 String ALIAS = "ogosense-0000";              // alias name netpie
-char *me = "/ogosense/0000000";                  // topic set for sensor box
-char *mystatus = "/ogosense/0000000/status";     // topic status "1" or "0", "ON" or "OFF"
+char *me = "/ogosense/1";                  // topic set for sensor box
+char *relayStatus1 = "/ogosense/relay/1/status";     // topic status "1" or "0", "ON" or "OFF"
+char *relayStatus2 = "/ogosense/relay/2/status";     // topic status "1" or "0", "ON" or "OFF"
 
 MicroGear microgear(client);
 #endif

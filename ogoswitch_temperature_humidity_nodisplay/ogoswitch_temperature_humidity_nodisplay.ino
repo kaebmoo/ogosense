@@ -268,9 +268,9 @@ void setup()
     Serial.print("\t");
     Serial.print(ALIAS);
     Serial.print("\t");
-    Serial.println(mystatus1);
+    Serial.println(relayStatus1);
     #ifdef SECONDRELAY
-    Serial.println(mystatus2);
+    Serial.println(relayStatus2);
     #endif
   #endif
 
@@ -401,9 +401,9 @@ void loop() {
   if (microgear.connected()) {
     microgear.loop();
     Serial.println("publish to netpie");
-    microgear.publish(mystatus1, digitalRead(RELAY1), true);
+    microgear.publish(relayStatus1, digitalRead(RELAY1), true);
     #ifdef SECONDRELAY
-    microgear.publish(mystatus2, digitalRead(RELAY2), true);
+    microgear.publish(relayStatus2, digitalRead(RELAY2), true);
     #endif
   }
   else {
