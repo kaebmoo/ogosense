@@ -33,8 +33,8 @@ SOFTWARE.
  */
 
 /* Comment this out to disable prints and save space */
-#define BLYNK_DEBUG // Optional, this enables lots of prints
-#define BLYNK_PRINT Serial
+// #define BLYNK_DEBUG // Optional, this enables lots of prints
+// #define BLYNK_PRINT Serial
 
 // #define SLEEP
 // #define MATRIXLED
@@ -345,16 +345,9 @@ void setup()
   #ifdef NETPIE
     microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
     microgear.connect(APPID);
-  #endif#ifdef THINGSPEAK
-  ThingSpeak.begin( client );
   #endif
-
-  // microgear.useTLS(true);
-  #ifdef NETPIE
-    microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
-    microgear.connect(APPID);
-  #endif
-
+  
+  
   // Setup a function to be called every second
   // gauge1Push_reset = blynkTimer.setInterval(4000L, displayTemperature);
   // gauge2Push_reset = blynkTimer.setInterval(4000L, displayHumidity);
