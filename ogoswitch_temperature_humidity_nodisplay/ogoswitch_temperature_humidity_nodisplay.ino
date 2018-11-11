@@ -105,7 +105,7 @@ char *writeAPIKey = "8M07EYX8NPCD9V8U";
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
-char auth[] = "";
+char auth[] = "XXXXXXXXXXed4061bb4e0dXXXXXXXXXX";
 bool blynkConnectedResult = false;
 int blynkreconnect = 0;
 
@@ -1470,6 +1470,40 @@ BLYNK_WRITE(V3)
 
 }
 
+BLYNK_WRITE(V19)
+{
+  switch (param.asInt())
+  {
+    case 1: // Item 1
+      Serial.println("Item 1 selected (humidity)");
+      options = 0;
+      Blynk.virtualWrite(V22, 0);   // backward compatible 
+      break;
+    case 2: // Item 2
+      Serial.println("Item 2 selected (temperature)");
+      options = 1;
+      Blynk.virtualWrite(V22, 1);   // backward compatible
+      break;
+    case 3: // Item 3
+      Serial.println("Item 3 selected (temperature & humidity)");
+      options = 2;
+      Blynk.virtualWrite(V22, 2);   // backward compatible
+      break;
+    case 4: // Item 4
+      Serial.println("Item 4 selected (soil moisture)");
+      options = 3;
+      Blynk.virtualWrite(V22, 3);   // backward compatible
+      break;
+    case 5: // Item 5
+      Serial.println("Item 5 selected (temperature, humidity)");
+      options = 4;
+      Blynk.virtualWrite(V22, 4);   // backward compatible
+      break;
+    default:
+      Serial.println("Unknown item selected");
+}
+}
+
 BLYNK_WRITE(V20)
 {
   int pinValue = param.asInt(); // assigning incoming value from pin V20 to a variable
@@ -1601,6 +1635,7 @@ BLYNK_CONNECTED()
     led2.off();
     Blynk.syncVirtual(V1);
   }
+  Blynk.syncVirtual(V19);
   Blynk.syncVirtual(V20);
   Blynk.syncVirtual(V21);
   Blynk.syncVirtual(V22);
