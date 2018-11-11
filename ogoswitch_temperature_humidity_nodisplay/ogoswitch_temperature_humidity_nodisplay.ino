@@ -33,14 +33,16 @@ SOFTWARE.
  */
 
 /* Comment this out to disable prints and save space */
-// #define BLYNK_DEBUG // Optional, this enables lots of prints
-// #define BLYNK_PRINT Serial
+#define BLYNK_DEBUG // Optional, this enables lots of prints
+#define BLYNK_PRINT Serial
 
 // #define SLEEP
 // #define MATRIXLED
 // #define SOILMOISTURE
 // #define EXTERNALSENSE
+
 #define BLYNKLOCAL
+
 // #define
 #define SECONDRELAY
 
@@ -312,16 +314,10 @@ void setup()
   httpUpdater.setup(&httpServer, update_path, update_username, update_password);
   httpServer.begin();
   MDNS.addService("http", "tcp", 80);
-  Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);
+  Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);  
 
-  ThingSpeak.begin( client );
-
-  // microgear.useTLS(true);
-  #ifdef NETPIE
-    microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
-    microgear.connect(APPID);
-  #endif
-
+  Serial.print("blynk auth token: ");
+  Serial.println(auth);
   #ifdef BLYNKLOCAL
     Blynk.config(auth, "blynk.ogonan.com", 80);
   #endif
@@ -341,6 +337,23 @@ void setup()
     }
   #endif
 
+  #ifdef THINGSPEAK
+  ThingSpeak.begin( client );
+  #endif
+
+  // microgear.useTLS(true);
+  #ifdef NETPIE
+    microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
+    microgear.connect(APPID);
+  #endif#ifdef THINGSPEAK
+  ThingSpeak.begin( client );
+  #endif
+
+  // microgear.useTLS(true);
+  #ifdef NETPIE
+    microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
+    microgear.connect(APPID);
+  #endif
 
   // Setup a function to be called every second
   // gauge1Push_reset = blynkTimer.setInterval(4000L, displayTemperature);
@@ -652,7 +665,7 @@ int keepState = 0;
 int minADC = 0;                       // replace with min ADC value read in air
 int maxADC = 928;                     // replace with max ADC value read fully submerged in water
 int mappedValue = 0;
-int soilMoistureLevel = 50
+
 
 void soilMoistureSensor()
 {

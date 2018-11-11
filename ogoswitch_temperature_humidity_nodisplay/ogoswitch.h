@@ -42,7 +42,7 @@ SOFTWARE.
 
 
 #ifdef SOILMOISTURE
-  #define soilMoistureLevel 500
+  #define soilMoistureLevel 50
 #endif
 
 
