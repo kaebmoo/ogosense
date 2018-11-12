@@ -85,7 +85,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 9;
+const int FW_VERSION = 10;  // 2018 11 13 version 10 fixed bug 
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
   String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
