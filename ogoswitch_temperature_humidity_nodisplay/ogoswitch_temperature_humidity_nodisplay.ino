@@ -928,9 +928,6 @@ void readSensor()
         #endif
       }
 
-      // if (options == 4) {
-
-      // }
 
       Serial.print("tempon = ");
       Serial.print(tempon);
@@ -1378,12 +1375,10 @@ BLYNK_WRITE(V1)
   Serial.println(pinValue);
   if (!AUTO) {
     if (pinValue == 1) {
-      // turnrelay_onoff(HIGH);
       turnRelayOn();
       RelayEvent = true;
     }
     else {
-      // turnrelay_onoff(LOW);
       turnRelayOff();
       if (afterStart != -1) {
             t_relay.stop(afterStart);
@@ -1618,9 +1613,16 @@ BLYNK_CONNECTED()
   Serial.println("Blynk Connected");
   // Blynk.syncAll();
 
-  int relay_status = digitalRead(RELAY1);
-  Blynk.virtualWrite(V1, relay_status);
-  if (relay_status == 1) {
+  int relay1_status = digitalRead(RELAY1);
+  Blynk.virtualWrite(V1, relay1_status);
+  #ifdef SECONDRELAY
+  int relay2_status = digitalRead(RELAY2);
+  Blynk.virtualWrite(V3, relay2_status);
+  #endif
+  
+
+  
+  if (relay1_status == 1) {
     led1.on();
   }
   else {
