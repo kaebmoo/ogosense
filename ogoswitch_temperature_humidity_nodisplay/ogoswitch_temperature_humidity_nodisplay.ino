@@ -1708,6 +1708,7 @@ void checkBlynkConnection() {
     if (blynkreconnect >= 10) {
       // delay(60000);
       // ESP.reset();
+      blynkreconnect = 0;
     }
   }
 }
