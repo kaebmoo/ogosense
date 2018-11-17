@@ -110,7 +110,7 @@ bool blynkConnectedResult = false;
 int blynkreconnect = 0;
 
 
-WidgetLED led1(10); // On led RELAY1
+WidgetLED led1(13); // On led RELAY1
 WidgetLED led2(11); // Auto status
 WidgetLED led3(12); // ON LED RELAY2
 
@@ -419,9 +419,7 @@ void loop() {
   #endif
 
   #if defined(BLYNKLOCAL) || defined(BLYNK)
-  if (Blynk.connected()) {
-    Blynk.run();
-  }
+  Blynk.run();
   #endif
 
   blynkTimer.run();
@@ -678,8 +676,8 @@ void soilMoistureSensor()
       Serial.println("Soil Moisture mode: Turn Relay Off");
       turnRelayOff();
       delay(300);
-      Blynk.virtualWrite(V1, 0);
-      // Blynk.syncVirtual(V1);
+      Blynk.virtualWrite(V0, 0);
+      // Blynk.syncVirtual(V0);
       RelayEvent = false;
     }
   }
@@ -689,7 +687,7 @@ void soilMoistureSensor()
       Serial.println("Soil Moisture mode: Turn Relay On");
       turnRelayOn();
       delay(300);
-      Blynk.virtualWrite(V1, 1);
+      Blynk.virtualWrite(V0, 1);
       RelayEvent = true;
     }
   }
@@ -941,7 +939,14 @@ void readSensor()
       Serial.println(afterStop);
       Serial.println();
 
-
+      Serial.print("Relay #1 Status ");
+      bool value1 = (0!=(*portOutputRegister( digitalPinToPort(RELAY1) ) & digitalPinToBitMask(RELAY1)));
+      Serial.println(value1);
+      #ifdef SECONDRELAY
+      Serial.print("Relay #2 Status ");
+      bool value2 = (0!=(*portOutputRegister( digitalPinToPort(RELAY2) ) & digitalPinToBitMask(RELAY2)));
+      Serial.println(value2);
+      #endif
 
     } // if sensor OK
     else
@@ -1076,7 +1081,7 @@ void turnRelayOn()
   Serial.println("RELAY1 ON");
   digitalWrite(LED_BUILTIN, LOW);  // turn on
   led1.on();
-  Blynk.virtualWrite(V1, 1);
+  Blynk.virtualWrite(V0, 1);
   buzzer_sound();
 }
 
@@ -1086,7 +1091,7 @@ void turnRelayOff()
   Serial.println("RELAY1 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
   led1.off();
-  Blynk.virtualWrite(V1, 0);
+  Blynk.virtualWrite(V0, 0);
   buzzer_sound();
 }
 
@@ -1366,7 +1371,7 @@ void onConnected(char *attribute, uint8_t* msg, unsigned int msglen)
 }
 #endif
 
-BLYNK_WRITE(V1)
+BLYNK_WRITE(V0)
 {
   int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
 
@@ -1610,23 +1615,34 @@ BLYNK_READ(V6)
 
 BLYNK_CONNECTED()
 {
-  Serial.println("Blynk Connected");
+  bool relay1_status, relay2_status;
+  
+  Serial.println("Blynk Sync.");
   // Blynk.syncAll();
 
-  int relay1_status = digitalRead(RELAY1);
-  Blynk.virtualWrite(V1, relay1_status);
-  #ifdef SECONDRELAY
-  int relay2_status = digitalRead(RELAY2);
-  Blynk.virtualWrite(V3, relay2_status);
-  #endif
+  relay1_status = (0!=(*portOutputRegister( digitalPinToPort(RELAY1) ) & digitalPinToBitMask(RELAY1)));
+  Blynk.virtualWrite(V0, relay1_status);
+  Serial.print("Relay #1 status = "); Serial.println(relay1_status);
   
+  #ifdef SECONDRELAY
+  relay2_status = (0!=(*portOutputRegister( digitalPinToPort(RELAY2) ) & digitalPinToBitMask(RELAY2)));
+  Blynk.virtualWrite(V3, relay2_status);
+  Serial.print("Relay #2 status = "); Serial.println(relay2_status);
+  #endif
 
   
+  
   if (relay1_status == 1) {
-    led1.on();
+    led1.on();  
   }
   else {
     led1.off();
+  }
+  if(relay2_status == 1) {
+    led3.on();
+  }
+  else {
+    led3.off();
   }
   if (AUTO) {
     Blynk.virtualWrite(V2, 1);
@@ -1635,7 +1651,8 @@ BLYNK_CONNECTED()
   else {
     Blynk.virtualWrite(V2, 0);
     led2.off();
-    Blynk.syncVirtual(V1);
+    Blynk.syncVirtual(V0);
+    Blynk.syncVirtual(V3);
   }
   Blynk.syncVirtual(V19);
   Blynk.syncVirtual(V20);
