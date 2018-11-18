@@ -1118,6 +1118,7 @@ void turnRelay2Off()
 void turnoff()
 {
   afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
+  t_relay.stop(afterStart);
   if (standbyPeriod >= 5000) {
     // turnrelay_onoff(LOW);
     turnRelayOff();
@@ -1128,6 +1129,7 @@ void turnoff()
 
 void delayStart()
 {
+  t_delayStart.stop(afterStop);
   RelayEvent = false;
   afterStop = -1;
   Serial.println("Timer Delay Relay #1 End.");
@@ -1136,6 +1138,7 @@ void delayStart()
 void turnoffRelay2()
 {
   afterStop2 = t_delayStart2.after(standbyPeriod, delayStart2);   // 10 * 60 * 1000 = 10 minutes
+  t_relay2.stop(afterStart2);
   if (standbyPeriod >= 5000) {
     // turnrelay_onoff(LOW);
     turnRelay2Off();
@@ -1146,6 +1149,7 @@ void turnoffRelay2()
 
 void delayStart2()
 {
+  t_delayStart2.stop(afterStop2);
   Relay2Event = false;
   afterStop2 = -1;
   Serial.println("Timer Delay Relay #2 End.");
