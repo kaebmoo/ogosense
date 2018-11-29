@@ -126,7 +126,7 @@ void setup(){
   Serial.println(WiFi.psk());
   String SSID = WiFi.SSID();
   String PSK = WiFi.psk();
-  WiFi.begin("Red1", "12345678");
+  WiFi.begin("Red", "12345678");
   Serial.print("Connecting");
   Serial.println();
 
@@ -157,6 +157,7 @@ void setup(){
   setup_mqtt();
   readAndSendLightLevel();
   // timer.every(60000, readAndSendLightLevel);
+  timer.oscillate(D4, 1000, LOW);
   lastSend = 0;
 }
 
