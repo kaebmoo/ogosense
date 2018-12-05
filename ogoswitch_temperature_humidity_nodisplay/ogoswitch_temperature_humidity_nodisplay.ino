@@ -41,10 +41,10 @@ SOFTWARE.
 // #define SOILMOISTURE
 // #define EXTERNALSENSE
 
-#define BLYNKLOCAL
+// #define BLYNKLOCAL
 
 // #define
-#define SECONDRELAY
+// #define SECONDRELAY
 
 #ifdef MATRIXLED
   #include <MLEDScroll.h>
@@ -178,9 +178,9 @@ char c_channelid[8] = "";       // channel id thingspeak
 int SAVE = 6550;            // Configuration save : if 6550 = saved
 int COOL = 1;               // true > set point Cool mode, false < set point = HEAT mode
 int MOISTURE = 0;           // true < set point moisture mode ; false > set point Dehumidifier mode
-boolean tempon = false;     // flag ON/OFF
-boolean humion = false;     // flag ON/OFF
-boolean AUTO = true;        // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
+bool tempon = false;     // flag ON/OFF
+bool humion = false;     // flag ON/OFF
+bool AUTO = true;        // AUTO or Manual Mode ON/OFF relay, AUTO is depend on temperature, humidity; Manual is depend on Blynk command
 int options = 0;            // option : 0 = humidity only, 1 = temperature only, 2 = temperature & humidiy
 
 
@@ -851,7 +851,9 @@ void readSensor()
               afterStart2 = t_relay2.after(onPeriod, turnoffRelay2);
               Serial.println("On Timer Relay #2 Start.");
               Relay2Event = true;
+              #ifdef SECONDRELAY
               turnRelay2On();
+              #endif
             }
           }
 
@@ -879,9 +881,13 @@ void readSensor()
               afterStart2 = -1;
             }
             Serial.println("OFF");
+            #ifdef SECONDRELAY
             if (digitalRead(RELAY2) == HIGH) {
+              
               turnRelay2Off();
+              
             }
+            #endif
 
             // delay start
             if (Relay2Event == true && afterStop2 == -1) {
@@ -1095,6 +1101,7 @@ void turnRelayOff()
   buzzer_sound();
 }
 
+#ifdef SECONDRELAY
 void turnRelay2On()
 {
   digitalWrite(RELAY2, HIGH);
@@ -1114,6 +1121,7 @@ void turnRelay2Off()
   Blynk.virtualWrite(V3, 0);
   buzzer_sound();
 }
+#endif
 
 void turnoff()
 {
@@ -1141,7 +1149,9 @@ void turnoffRelay2()
   t_relay2.stop(afterStart2);
   if (standbyPeriod >= 5000) {
     // turnrelay_onoff(LOW);
+    #ifdef SECONDRELAY
     turnRelay2Off();
+    #endif
     Serial.println("Timer Stop: RELAY2 OFF");
   }
   afterStart2 = -1;
@@ -1442,11 +1452,15 @@ BLYNK_WRITE(V3)
   Serial.println(pinValue);
   if (!AUTO) {
     if (pinValue == 1) {
+      #ifdef SECONDRELAY
       turnRelay2On();
+      #endif
       Relay2Event = true;
     }
     else {
+      #ifdef SECONDRELAY
       turnRelay2Off();
+      #endif
       if (afterStart2 != -1) {
             t_relay2.stop(afterStart2);
 
@@ -1505,7 +1519,7 @@ BLYNK_WRITE(V19)
       break;
     default:
       Serial.println("Unknown item selected");
-}
+  }
 }
 
 BLYNK_WRITE(V20)
