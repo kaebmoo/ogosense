@@ -632,11 +632,12 @@ void OnceOnlyTask2()
   blynkTimer.restartTimer(gauge2Push_reset);
 }
 
+
 float checkBattery()
 {
   unsigned int raw = 0;
   float volt = 0.0;
-
+    
   raw = analogRead(A0);
   volt = raw * (3.7 / 1023.0);
   // volt = volt * 4.2;
@@ -648,7 +649,6 @@ float checkBattery()
   Serial.println(volt);
 
   return(volt);
-
 }
 
 #ifdef SOILMOISTURE
@@ -1350,7 +1350,7 @@ void sendThingSpeak()
     ThingSpeak.setField( 4, (float) freeheap );
     ThingSpeak.setField( 5, blynkConnectedResult);
     #ifdef SLEEP
-      volt = checkBattery();
+      float volt = checkBattery();
       ThingSpeak.setField(6, volt);
     #endif
 
