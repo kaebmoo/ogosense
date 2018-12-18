@@ -41,10 +41,10 @@ SOFTWARE.
 // #define SOILMOISTURE
 // #define EXTERNALSENSE
 
-// #define BLYNKLOCAL
+#define BLYNKLOCAL
 
 // #define
-// #define SECONDRELAY
+#define SECONDRELAY
 
 #ifdef MATRIXLED
   #include <MLEDScroll.h>
@@ -1415,6 +1415,12 @@ BLYNK_WRITE(V0)
   }
   else {
     Serial.println("auto mode!");
+    if(RelayEvent) {
+      Blynk.virtualWrite(V0, 1);
+    }
+    else {
+      Blynk.virtualWrite(V0, 0);
+    }
   }
 
   Serial.print(" RelayEvent = ");
@@ -1424,6 +1430,29 @@ BLYNK_WRITE(V0)
   Serial.print(" afterStop = ");
   Serial.println(afterStop);
 
+}
+
+BLYNK_WRITE(V1)
+{
+  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
+
+  if(!AUTO) {
+    if (pinValue == 1) {
+      Blynk.virtualWrite(V0, 1);
+    }
+    else {
+      Blynk.virtualWrite(V0, 0);
+    }
+  }
+  else {
+    Serial.println("auto mode!");
+    if(RelayEvent) {
+      Blynk.virtualWrite(V1, 1);
+    }
+    else {
+      Blynk.virtualWrite(V1, 0);
+    }
+  }
 }
 
 BLYNK_WRITE(V2)
@@ -1477,6 +1506,12 @@ BLYNK_WRITE(V3)
   }
   else {
     Serial.println("auto mode!");
+    if(RelayEvent) {
+      Blynk.virtualWrite(V3, 1);
+    }
+    else {
+      Blynk.virtualWrite(V3, 0);
+    }
   }
 
   Serial.print(" RelayEvent = ");
