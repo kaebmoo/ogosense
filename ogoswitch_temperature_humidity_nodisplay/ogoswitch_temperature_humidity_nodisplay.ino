@@ -440,6 +440,8 @@ void autoWifiConnect()
   WiFiManager wifiManager;
   String APName;
 
+  wifiManager.setBreakAfterConfig(true);
+
   WiFiManagerParameter custom_t_setpoint("temperature", "temperature setpoint : 0-100", t_setpoint, 6);
   WiFiManagerParameter custom_t_range("t_range", "temperature range : 0-50", t_range, 6);
   WiFiManagerParameter custom_h_setpoint("humidity", "humidity setpoint : 0-100", h_setpoint, 6);
