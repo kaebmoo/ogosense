@@ -44,9 +44,9 @@ PubSubClient mqttClient(sensorClient);
 char *myRoom = "sensor/light/1";
 int mqtt_reconnect = 0;
 
-#define TOKEN "CxBiywwBk1FyjIXBxzWF"  // device token a45GVxXw4HnJb6SwdwUT  box: UpF71PeawEvCvbY3cPwH pi0w: kgXTXXF5eceFJZ3V2WEw
+#define TOKEN "szutN5dnjjnS2AZdcFCe"  // device token a45GVxXw4HnJb6SwdwUT  box: UpF71PeawEvCvbY3cPwH pi0w: kgXTXXF5eceFJZ3V2WEw
 #define MQTTPORT  1883 // 1883 or 1888
-char thingsboardServer[] = "box.greenwing.email";
+char thingsboardServer[] = "192.168.2.64";           // "box.greenwing.email"
 #define SENDINTERVAL  10000  // send data interval time
 
 unsigned long lastSend;
