@@ -54,6 +54,17 @@ SOFTWARE.
 Hardware: Wemos D1, Battery shield, Relay shield, Switching Power Supply 220VAC-12VDC, LiPo Battery 3.7V, Voltage Sensor Module 0-24VDC
 */
 
+#include <ESP8266WiFi.h> //https://github.com/esp8266/Arduino
+//needed for library
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
+#include <ArduinoJson.h> //https://github.com/bblanchon/ArduinoJson
+
+//flag for saving data
+bool shouldSaveConfig = false;
+
+
 // constants won't change. Used here to set a pin number:
 const int ledPin =  LED_BUILTIN;// the number of the LED pin
 
@@ -75,6 +86,9 @@ void setup() {
   pinMode(A0, OUTPUT);
   
   Serial.begin(115200);
+  Serial.println();
+
+  setupWifi();
 }
 
 void loop() {
@@ -122,4 +136,37 @@ void blink()
     // set the LED with the ledState of the variable:
     digitalWrite(ledPin, ledState);
   }
+}
+
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
+
+void setupWifi()
+{
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wifiManager;
+
+  wifiManager.setBreakAfterConfig(true);
+  wifiManager.setConfigPortalTimeout(60);
+  
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  String alias = "ogosense-"+String(ESP.getChipId());
+  if (!wifiManager.autoConnect(alias.c_str(), "")) {
+    Serial.println("failed to connect and hit timeout");
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
+
+  //if you get here you have connected to the WiFi
+  Serial.println("connected...yeey :)");
+  
 }
