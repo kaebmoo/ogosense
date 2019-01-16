@@ -60,6 +60,9 @@ Hardware: Wemos D1, Battery shield, Relay shield, Switching Power Supply 220VAC-
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
 #include <ArduinoJson.h> //https://github.com/bblanchon/ArduinoJson
+#include <Time.h>
+#include <TimeAlarms.h>
+#include <ThingSpeak.h>
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -78,7 +81,21 @@ unsigned long previousMillis = 0;        // will store last time LED was updated
 // constants won't change:
 const long interval = 1000;           // interval at which to blink (milliseconds)
 int analogData;
-float analogConvert;
+int powerLine;
+int countOn = 0;
+int countOff = 0;
+
+// ThingSpeak information
+char thingSpeakAddress[] = "api.thingspeak.com";
+unsigned long channelID = 678846;
+char* readAPIKey = "3KOW8UOKWPRQM9XE";
+char* writeAPIKey = "M0PIRXCIQ5MQJ0PK";
+const unsigned long postingInterval = 300L * 1000L;
+long lastUpdateTime = 0; 
+
+WiFiClient client; 
+
+AlarmId idAlarm;
 
 void setup() {
   // set the digital pin as output:
@@ -94,6 +111,7 @@ void setup() {
 void loop() {
   // here is where you'd put code that needs to be running all the time.
   float dif;
+  int writeSuccess;
 
   blink();
   analogData = analogRead(A0);
@@ -107,11 +125,33 @@ void loop() {
 
   if (dif < 2.0) {
     Serial.println("WTF!!!");
+    powerLine = 0;
+    if (countOff == 0) {
+      powerLineOff();
+    }
+    countOff++;
   }
-  else if (dif >= 2.4) {
+  else if (dif >= 2.0) {                // without battery = 2.29, with battery 2.4
     Serial.println("Power line OK");
+    powerLine = 1;
+    if (countOff > 0) {
+      Alarm.free(idAlarm);
+      idAlarm = dtINVALID_ALARM_ID;
+      countOff = 0;
+      
+      writeSuccess = write2ThingSpeak();
+      if (writeSuccess != 200) {
+        Alarm.delay(5000);
+        writeSuccess = write2ThingSpeak();
+      }
+    }    
+    
+    if (millis() - lastUpdateTime >=  postingInterval) {
+      lastUpdateTime = millis();
+      writeSuccess = write2ThingSpeak();
+    }
   }
-  delay(500);
+  Alarm.delay(500);
 }
 
 void blink()
@@ -160,13 +200,59 @@ void setupWifi()
   String alias = "ogosense-"+String(ESP.getChipId());
   if (!wifiManager.autoConnect(alias.c_str(), "")) {
     Serial.println("failed to connect and hit timeout");
-    delay(3000);
+    Alarm.delay(3000);
     //reset and try again, or maybe put it to deep sleep
     ESP.reset();
-    delay(5000);
+    Alarm.delay(5000);
   }
 
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
+  ThingSpeak.begin( client );
+}
+
+int write2ThingSpeak()
+{
+  Serial.println("Sending data to ThingSpeak");
+  Serial.print("Power Line Status:");
+  Serial.println(powerLine);
   
+  ThingSpeak.setField( 1, powerLine );
+  int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
+  Serial.print("Send to Thingspeak status: ");
+  Serial.println(writeSuccess);
+  
+  return writeSuccess;
+}
+
+void powerLineOff()
+{
+  int writeSuccess;
+  writeSuccess = write2ThingSpeak();
+  if (writeSuccess != 200) {
+    Alarm.delay(5000);
+    writeSuccess = write2ThingSpeak();
+  }
+  
+  Serial.println("Power Line Down : Trigger");
+  idAlarm = Alarm.timerRepeat(15, sendStatus);
+  Alarm.timerOnce(300, clearCounting);
+}
+
+void sendStatus()
+{
+  int writeSuccess;
+  writeSuccess = write2ThingSpeak();
+  if (writeSuccess != 200) {
+    Alarm.delay(5000);
+    writeSuccess = write2ThingSpeak();
+  }
+}
+
+void clearCounting()
+{
+  Serial.println("Clear Power Line Off Counting");
+  Alarm.free(idAlarm);
+  idAlarm = dtINVALID_ALARM_ID;
+  countOff = 0;
 }
