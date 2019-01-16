@@ -62,6 +62,7 @@ Hardware: Wemos D1, Battery shield, Relay shield, Switching Power Supply 220VAC-
 #include <ArduinoJson.h> //https://github.com/bblanchon/ArduinoJson
 #include <Time.h>
 #include <TimeAlarms.h>
+#include "Timer.h"
 #include <ThingSpeak.h>
 
 //flag for saving data
@@ -85,6 +86,7 @@ int powerLine;
 float dif;
 int countOn = 0;
 int countOff = 0;
+int idTimer;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
@@ -97,6 +99,7 @@ long lastUpdateTime = 0;
 WiFiClient client; 
 
 AlarmId idAlarm;
+Timer timer;
 
 void setup() {
   // set the digital pin as output:
@@ -119,6 +122,7 @@ void loop() {
   checkPowerLine();
   
   Alarm.delay(500);
+  timer.update();
 }
 
 void checkPowerLine()
@@ -151,9 +155,8 @@ void checkPowerLine()
       countOff = 0;
       
       writeSuccess = write2ThingSpeak();
-      if (writeSuccess != 200) {
-        Alarm.delay(15000);
-        writeSuccess = write2ThingSpeak();
+      if (writeSuccess != 200) {                
+        idTimer = timer.after(15000, write2ThingSpeakAgain);
       }
     }    
     
@@ -239,9 +242,8 @@ void powerLineOff()
 {
   int writeSuccess;
   writeSuccess = write2ThingSpeak();
-  if (writeSuccess != 200) {
-    Alarm.delay(5000);
-    writeSuccess = write2ThingSpeak();
+  if (writeSuccess != 200) {    
+    idTimer = timer.after(15000, write2ThingSpeakAgain);
   }
   
   Serial.println("Power Line Down : Trigger");
@@ -256,9 +258,8 @@ void sendStatus()
   writeSuccess = write2ThingSpeak();
   Alarm.enable(idAlarm);
   if (writeSuccess != 200) {
-    Alarm.delay(15000);
     Alarm.disable(idAlarm);
-    writeSuccess = write2ThingSpeak();
+    idTimer = timer.after(15000, write2ThingSpeakAgain);   
     Alarm.enable(idAlarm);
   }
 }
@@ -269,4 +270,11 @@ void clearCounting()
   Alarm.free(idAlarm);
   idAlarm = dtINVALID_ALARM_ID;
   countOff = 0;
+}
+
+void write2ThingSpeakAgain()
+{
+  Serial.println("Send data to ThingSpeak again");
+  write2ThingSpeak();
+  timer.stop(idTimer);
 }
