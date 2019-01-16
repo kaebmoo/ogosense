@@ -82,6 +82,7 @@ unsigned long previousMillis = 0;        // will store last time LED was updated
 const long interval = 1000;           // interval at which to blink (milliseconds)
 int analogData;
 int powerLine;
+float dif;
 int countOn = 0;
 int countOff = 0;
 
@@ -106,14 +107,24 @@ void setup() {
   Serial.println();
 
   setupWifi();
+  checkPowerLine();
+  write2ThingSpeak();
 }
 
 void loop() {
   // here is where you'd put code that needs to be running all the time.
-  float dif;
-  int writeSuccess;
-
+  
   blink();
+
+  checkPowerLine();
+  
+  Alarm.delay(500);
+}
+
+void checkPowerLine()
+{
+  int writeSuccess;
+  
   analogData = analogRead(A0);
   Serial.print("Analog Read: ");
   Serial.println(analogData);
@@ -151,7 +162,6 @@ void loop() {
       writeSuccess = write2ThingSpeak();
     }
   }
-  Alarm.delay(500);
 }
 
 void blink()
@@ -242,10 +252,14 @@ void powerLineOff()
 void sendStatus()
 {
   int writeSuccess;
+  Alarm.disable(idAlarm);
   writeSuccess = write2ThingSpeak();
+  Alarm.enable(idAlarm);
   if (writeSuccess != 200) {
-    Alarm.delay(5000);
+    Alarm.delay(15000);
+    Alarm.disable(idAlarm);
     writeSuccess = write2ThingSpeak();
+    Alarm.enable(idAlarm);
   }
 }
 
