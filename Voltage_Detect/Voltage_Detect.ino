@@ -152,7 +152,7 @@ void checkPowerLine()
       
       writeSuccess = write2ThingSpeak();
       if (writeSuccess != 200) {
-        Alarm.delay(5000);
+        Alarm.delay(15000);
         writeSuccess = write2ThingSpeak();
       }
     }    
