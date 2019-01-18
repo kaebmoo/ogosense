@@ -64,7 +64,11 @@ Hardware: Wemos D1, Battery shield, Relay shield, Switching Power Supply 220VAC-
 #include <TimeAlarms.h>
 #include "Timer.h"
 #include <ThingSpeak.h>
+#include <Adafruit_ADS1015.h>
+#include <PubSubClient.h>
 
+
+const int RELAY1 = D7;
 //flag for saving data
 bool shouldSaveConfig = false;
 
@@ -87,19 +91,33 @@ float dif;
 int countOn = 0;
 int countOff = 0;
 int idTimer;
+float batteryVoltage = 0.0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
+const char* server = "mqtt.thingspeak.com"; 
 unsigned long channelID = 678846;
 char* readAPIKey = "3KOW8UOKWPRQM9XE";
 char* writeAPIKey = "M0PIRXCIQ5MQJ0PK";
+
+char mqttUserName[] = "chang";  // Can be any name.
+char mqttPass[] = "";  // Change this your MQTT API Key from Account > MyProfile.
+String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
+
 const unsigned long postingInterval = 300L * 1000L;
 long lastUpdateTime = 0; 
-
+static const char alphanum[] ="0123456789"
+                              "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                              "abcdefghijklmnopqrstuvwxyz";  // For random generation of client ID.
+                              
 WiFiClient client; 
+PubSubClient mqttClient(client); 
 
 AlarmId idAlarm;
-Timer timer;
+Timer timer, timerCheckBattery, timerSwitch;
+int idTimerSwitch;
+
+Adafruit_ADS1015 ads1015;
 
 void setup() {
   // set the digital pin as output:
@@ -109,9 +127,14 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
 
+  ads1015.begin();
   setupWifi();
   checkPowerLine();
+  checkBattery();
   write2ThingSpeak();
+  timerCheckBattery.every(15000, checkBattery);
+  // Serial.println("Delay Start 15 sec.");
+  // delay(15000);
 }
 
 void loop() {
@@ -123,6 +146,19 @@ void loop() {
   
   Alarm.delay(500);
   timer.update();
+  timerCheckBattery.update();
+  timerSwitch.update();
+
+  /*
+   * 
+  // Reconnect if MQTT client is not connected.
+  if (!mqttClient.connected()) 
+  {
+    reconnect();
+  }
+  mqttClient.loop();   // Call the loop continuously to establish connection to the server.
+
+  */
 }
 
 void checkPowerLine()
@@ -222,6 +258,13 @@ void setupWifi()
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
   ThingSpeak.begin( client );
+  mqttConnect();
+}
+
+void mqttConnect()
+{
+  mqttClient.setServer(server, 1883);   // Set the MQTT broker details.
+  mqttClient.setCallback(callback);  
 }
 
 int write2ThingSpeak()
@@ -231,6 +274,7 @@ int write2ThingSpeak()
   Serial.println(powerLine);
   
   ThingSpeak.setField( 1, powerLine );
+  ThingSpeak.setField( 2, batteryVoltage );
   int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
   Serial.print("Send to Thingspeak status: ");
   Serial.println(writeSuccess);
@@ -277,4 +321,82 @@ void write2ThingSpeakAgain()
   Serial.println("Send data to ThingSpeak again");
   write2ThingSpeak();
   timer.stop(idTimer);
+}
+
+
+void checkBattery()
+{
+  int16_t adc0;
+  
+  
+  adc0 = ads1015.readADC_SingleEnded(0);
+  batteryVoltage = ((float) adc0 * 3) / 1000;
+  Serial.print("Analog read A0: ");
+  Serial.println(adc0);
+
+  Serial.print("Battery voltage: ");
+  Serial.println(batteryVoltage);
+}
+
+void reconnect() 
+{
+  char clientID[9];
+
+  // Loop until reconnected.
+  while (!mqttClient.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Generate ClientID
+    for (int i = 0; i < 8; i++) {
+        clientID[i] = alphanum[random(51)];
+    }
+    clientID[8]='\0';
+    // Connect to the MQTT broker
+    if (mqttClient.connect(clientID,mqttUserName,mqttPass)) {
+      Serial.print("Connected with Client ID:  ");
+      Serial.print(String(clientID));
+      Serial.print(", Username: ");
+      Serial.print(mqttUserName);
+      Serial.print(" , Passwword: ");
+      Serial.println(mqttPass);
+      mqttClient.subscribe( subscribeTopic.c_str() );
+    } 
+    else {
+      Serial.print("failed, rc=");
+      // Print to know why the connection failed.
+      // See https://pubsubclient.knolleary.net/api.html#state for the failure code explanation.
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+void callback(char* topic, byte* payload, unsigned int length) 
+{
+  int i;
+  char p[length + 1];
+  memcpy(p, payload, length);
+  p[length] = NULL;
+
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+
+  if (!strncmp(p, "on", 2) || !strncmp(p, "1", 1)) {
+    digitalWrite(RELAY1, HIGH);
+    idTimerSwitch = timerSwitch.after(10000, turnOn);
+  }
+  else if (!strncmp(p, "off", 3) || !strncmp(p, "0", 1) ) {
+    digitalWrite(RELAY1, LOW);
+  }
+}
+
+void turnOn()
+{
+  digitalWrite(RELAY1, LOW);
+  timerSwitch.stop(idTimerSwitch);
 }
