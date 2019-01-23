@@ -12,12 +12,16 @@
 #include <Adafruit_NeoPixel.h>
 #include <ThingSpeak.h>
 #include <ArduinoJson.h>
-#include <MicroGear.h>
+// #include <MicroGear.h>
 #include <MQTTClient.h>
 #include <PubSubClient.h>
-#include <SHA1.h>
-#include <AuthClient.h>
+// #include <SHA1.h>
+// #include <AuthClient.h>
 #include <debug.h>
+
+
+#define WIFI_AP "Red"
+#define WIFI_PASSWORD "12345678"
 
 #define TRIGGER_PIN D3
 #define PIN D4
@@ -38,7 +42,7 @@ unsigned long channelID = 432257;
 char *writeAPIKey = "ENQ9QDFP7SD3LS17";
 char *readAPIKey = "1JK0CKLYIPVH9T1E";
 
-MicroGear microgear(sensorClient);              // declare microgear object
+// MicroGear microgear(sensorClient);              // declare microgear object
 PubSubClient mqttClient(sensorClient);
 
 char *myRoom = "sensor/light/1";
@@ -47,7 +51,7 @@ int mqtt_reconnect = 0;
 #define TOKEN "szutN5dnjjnS2AZdcFCe"  // device token a45GVxXw4HnJb6SwdwUT  box: UpF71PeawEvCvbY3cPwH pi0w: kgXTXXF5eceFJZ3V2WEw
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "192.168.2.64";           // "box.greenwing.email"
-#define SENDINTERVAL  10000  // send data interval time
+#define SENDINTERVAL  60000  // send data interval time
 
 unsigned long lastSend;
 const int MAXRETRY=30;
@@ -126,7 +130,7 @@ void setup(){
   Serial.println(WiFi.psk());
   String SSID = WiFi.SSID();
   String PSK = WiFi.psk();
-  WiFi.begin("Red", "12345678");
+  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
   Serial.print("Connecting");
   Serial.println();
 
@@ -352,10 +356,19 @@ void set_gpio_status(int pin, boolean enabled) {
 
 void reconnect() {
   // Loop until we're reconnected
-
+  int status = WL_IDLE_STATUS;
 
   while (!mqttClient.connected()) {
     Serial.print("Attempting MQTT connection...");
+    status = WiFi.status();
+    if ( status != WL_CONNECTED) {
+      WiFi.begin(WIFI_AP, WIFI_PASSWORD);
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+      }
+      Serial.println("Connected to AP");
+    }
 
     // Attempt to connect
     #ifdef THINGSBOARD
