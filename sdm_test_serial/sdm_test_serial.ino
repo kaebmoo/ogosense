@@ -1,8 +1,8 @@
 /*
- * 
- * 
+ *
+ *
  * https://github.com/reaper7/SDM_Energy_Meter
- * 
+ *
  */
 
 
@@ -71,9 +71,9 @@ void setup() {
   pinMode(BUILTIN_LED, OUTPUT);
   digitalWrite(BUILTIN_LED, HIGH);
 
-  
+
   sdm.begin();
-  
+
   WiFi.begin(WIFI_AP, WIFI_PASSWORD);
   Serial.print("Connecting");
   Serial.println();
@@ -89,8 +89,8 @@ void setup() {
   }
   Serial.println();
   Serial.print("Connected, IP address: ");
-  Serial.println(WiFi.localIP()); 
-  
+  Serial.println(WiFi.localIP());
+
   ThingSpeak.begin( client );
   setupMqtt();
   blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
@@ -177,7 +177,7 @@ void sendThingSpeak()
   if(readCount != 0) {
     voltage = voltage / readCount;
     amp = amp / readCount;
-    watt = watt / readCount;    
+    watt = watt / readCount;
   }
 
     Serial.println("Sending data to thingspeak");
@@ -200,16 +200,16 @@ void sendThingSpeak()
     Serial.print("Total Energy: ");
     Serial.print(energy);
     Serial.println("kWh");
-    
-  
 
-  
+
+
+
     ThingSpeak.setField( 1, voltage );
     ThingSpeak.setField( 2, amp );
     ThingSpeak.setField( 3, watt);
     ThingSpeak.setField( 4, freq );
     ThingSpeak.setField( 5, energy);
-  
+
     int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
     Serial.println(writeSuccess);
     Serial.println();
@@ -223,12 +223,12 @@ void sendThingSpeak()
 void sendThingsBoard()
 {
   readMeterData();
-  if (readCount != 0) {    
+  if (readCount != 0) {
     // Just debug messages
     Serial.print( "Sending data to thingsboard: [" );
-    
+
     Serial.print( "]   -> " );
-  
+
     // Prepare a JSON payload string
     String payload = "{";
     payload += "\"Volt\":"; payload += voltage / readCount; payload += ",";
@@ -237,9 +237,9 @@ void sendThingsBoard()
     // payload += "\"Frequency\":"; payload += freq; payload += ",";
     payload += "\"Energy\":"; payload += energy; payload += ",";
     payload += "\"PF\":"; payload += pf; payload += ",";
-    payload += "\"Max Power Demand\":"; payload += MaxPowerDemand; 
+    payload += "\"Max Power Demand\":"; payload += MaxPowerDemand;
     payload += "}";
-  
+
     // Send payload
     char attributes[100];
     payload.toCharArray( attributes, 100 );
@@ -255,12 +255,12 @@ void sendStatus()
 {
   String payload = "{";
   if (amp > 0.0) {
-    payload += "\"Active\":"; payload += true;   
+    payload += "\"Active\":"; payload += true;
   }
   else if (amp == 0.0) {
-    payload += "\"Active\":"; payload += false;   
+    payload += "\"Active\":"; payload += false;
   }
-  
+
   payload += "}";
 
   // Send payload
@@ -287,7 +287,7 @@ void setupMqtt()
     #else
     Serial.println(mqtt_server);  // mqtt_server
     #endif
-    
+    mqttClient.subscribe("v1/devices/me/rpc/request/+");
     Serial.println();
   }
 }
@@ -317,6 +317,7 @@ void reconnect()
     #endif
       Serial.print("connected : ");
       Serial.println(thingsboardServer); // mqtt_server
+      mqttClient.subscribe("v1/devices/me/rpc/request/+");
 
 
 
@@ -372,7 +373,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     String responseTopic = String(topic);
     responseTopic.replace("request", "response");
     mqttClient.publish(responseTopic.c_str(), getStatus().c_str());
-  } 
+  }
   else if (methodName.equals("setGpioStatus")) {
 
   }
@@ -391,7 +392,7 @@ String getStatus()
   else if (amp == 0.0) {
     data["Active"] = false;
   }
-  
+
   char payload[256];
   data.printTo(payload, sizeof(payload));
 
