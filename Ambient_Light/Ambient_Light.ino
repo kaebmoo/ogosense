@@ -48,11 +48,12 @@ PubSubClient mqttClient(sensorClient);
 char *myRoom = "sensor/light/1";
 int mqtt_reconnect = 0;
 
-#define TOKEN "szutN5dnjjnS2AZdcFCe"  // device token a45GVxXw4HnJb6SwdwUT  box: UpF71PeawEvCvbY3cPwH pi0w: kgXTXXF5eceFJZ3V2WEw
+#define TOKEN "ME1wm1gCqCirrHqofjir"  // device token a45GVxXw4HnJb6SwdwUT  box: UpF71PeawEvCvbY3cPwH pi0w: kgXTXXF5eceFJZ3V2WEw
 #define MQTTPORT  1883 // 1883 or 1888
-char thingsboardServer[] = "192.168.2.64";           // "box.greenwing.email"
+char thingsboardServer[] = "thingsboard.ogonan.com";           // "box.greenwing.email" "192.168.2.64"
 #define SENDINTERVAL  60000  // send data interval time
 
+unsigned long lastMqttConnectionAttempt = 0;
 unsigned long lastSend;
 const int MAXRETRY=30;
 
@@ -354,12 +355,18 @@ void set_gpio_status(int pin, boolean enabled) {
 }
 
 
-void reconnect() {
+bool reconnect() {
   // Loop until we're reconnected
   int status = WL_IDLE_STATUS;
+  unsigned long now = millis();
+  
+  if (1000 > now - lastMqttConnectionAttempt) {
+    // Do not repeat within 1 sec.
+    return false;
+  }
+  Serial.println("Connecting to MQTT server...");
 
-  while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
+  if (!mqttClient.connected()) {    
     status = WiFi.status();
     if ( status != WL_CONNECTED) {
       WiFi.begin(WIFI_AP, WIFI_PASSWORD);
@@ -369,34 +376,24 @@ void reconnect() {
       }
       Serial.println("Connected to AP");
     }
-
+    Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     #ifdef THINGSBOARD
     if (mqttClient.connect(myRoom, TOKEN, NULL)) {  // connect to thingsboards
     #else
     if (mqttClient.connect(myRoom, mqtt_user, mqtt_password)) {  // connect to thingsboards
     #endif
-      Serial.print("connected : ");
-      Serial.println(thingsboardServer); // mqtt_server
-
-
-
+      Serial.println("Connected!");  
       // Once connected, publish an announcement...
       // mqttClient.publish(roomStatus, "hello world");
-
-    } else {
-      Serial.print("failed, reconnecting state = ");
-      Serial.print(mqttClient.state());
-      Serial.print(" try : ");
-      Serial.print(mqtt_reconnect+1);
-      Serial.println(" try again in 2 seconds");
-      // Wait 2 seconds before retrying
-      delay(2000);
     }
-    mqtt_reconnect++;
-    if (mqtt_reconnect > MAXRETRY) {
-      mqtt_reconnect = 0;
-      break;
+    else {
+      lastMqttConnectionAttempt = now;
+      return false;  
     }
+    
   }
+
+  return true;
+  
 }
