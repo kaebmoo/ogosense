@@ -88,20 +88,20 @@ ESP8266HTTPUpdateServer httpUpdater;
 const int FW_VERSION = 10;  // 2018 11 13 version 10 fixed bug 
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
+  String firmware_name = "ogoswitch_temperature_humidity_control.ino.d1_mini";
 #elif ARDUINO_ESP8266_WEMOS_D1MINILITE
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minilite";
+  String firmware_name = "ogoswitch_temperature_humidity_control.ino.d1_minilite";
 #elif ARDUINO_ESP8266_WEMOS_D1MINIPRO
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minipro";
+  String firmware_name = "ogoswitch_temperature_humidity_control.ino.d1_minipro";
 #endif
 
 
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 360709;
-char *readAPIKey = "GNZ8WEU763Z5DUEA";
-char *writeAPIKey = "8M07EYX8NPCD9V8U";
+unsigned long channelID = 470917;
+char *readAPIKey = "OVKF7VWLWY3VIST1";
+char *writeAPIKey = "UMJJIQOM7ZTQCMJ5";
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
@@ -161,8 +161,8 @@ float humidity_setpoint = HUMIDITY_SETPOINT;     // 60 set point RH %
 float humidity_range = HUMIDITY_RANGE;          // +- 20 from set point
 
 // set for wifimanager to get value from user
-char t_setpoint[6] = "30";
-char t_range[6] = "2";
+char t_setpoint[6] = "37.5";
+char t_range[6] = "0.5";
 char h_setpoint[6] = "60";
 char h_range[6] = "5";
 char c_options[6] = "1";
@@ -193,7 +193,7 @@ int ledState = LOW;
 unsigned long previousMillis = 0;
 
 const unsigned long onPeriod = 60L * 60L * 1000L;       // ON relay period minute * second * milli second
-const unsigned long standbyPeriod = 300L * 1000L;       // delay start timer for relay
+const unsigned long standbyPeriod = 1L * 1000L;       // delay start timer for relay
 
 // flag for saving data
 bool shouldSaveConfig = false;
@@ -281,8 +281,10 @@ void setup()
   EEPROM.begin(512);
   humidity_setpoint = (float) eeGetInt(0);
   humidity_range = (float) eeGetInt(4);
-  temperature_setpoint = (float) eeGetInt(8);
-  temperature_range = (float) eeGetInt(12);
+  // temperature_setpoint = (float) EEPROMReadlong(8);
+  // temperature_range = (float) EEPROMReadlong(12);
+  EEPROM.get(8, temperature_setpoint);
+  EEPROM.get(12, temperature_range);
   options = eeGetInt(16);
   COOL = eeGetInt(20);
   MOISTURE = eeGetInt(24);
@@ -295,8 +297,8 @@ void setup()
   if (saved == 6550) {
     dtostrf(humidity_setpoint, 2, 0, h_setpoint);
     dtostrf(humidity_range, 2, 0, h_range);
-    dtostrf(temperature_setpoint, 2, 0, t_setpoint);
-    dtostrf(temperature_range, 2, 0, t_range);
+    dtostrf(temperature_setpoint, 2, 2, t_setpoint);
+    dtostrf(temperature_range, 2, 2, t_range);
     itoa(options, c_options, 10);
     itoa(COOL, c_cool, 10);
     itoa(MOISTURE, c_moisture, 10);
@@ -572,8 +574,8 @@ void autoWifiConnect()
     strcpy(c_auth, custom_c_auth.getValue());
     strcpy(c_channelid, custom_c_channelid.getValue());
 
-    temperature_setpoint = atol(t_setpoint);
-    temperature_range = atol(t_range);
+    temperature_setpoint = atof(t_setpoint);
+    temperature_range = atof(t_range);
     humidity_setpoint = atol(h_setpoint);
     humidity_range = atol(h_range);
     options = atoi(c_options);
@@ -609,8 +611,11 @@ void autoWifiConnect()
 
     eeWriteInt(0, atoi(h_setpoint));
     eeWriteInt(4, atoi(h_range));
-    eeWriteInt(8, atoi(t_setpoint));
-    eeWriteInt(12, atoi(t_range));
+    // EEPROMWritelong(8, t_setpoint);
+    // EEPROMWritelong(12, t_range);
+    EEPROM.put(8, t_setpoint);
+    EEPROM.put(12, t_range);
+    EEPROM.commit();
     eeWriteInt(16, options);
     eeWriteInt(20, COOL);
     eeWriteInt(24, MOISTURE);
@@ -813,9 +818,8 @@ void readSensor()
         if (tempon == true && humion == true) {
           if (RelayEvent == false) {
             afterStart = t_relay.after(onPeriod, turnoff);
-            Serial.println("On Timer Start.");
-            RelayEvent = true;
-            // turnrelay_onoff(HIGH);
+            Serial.println("Turn On.");
+            RelayEvent = true;            
             turnRelayOn();
           }
         }
@@ -826,7 +830,6 @@ void readSensor()
           }
           Serial.println("OFF");
           if (digitalRead(RELAY1) == HIGH) {
-            // turnrelay_onoff(LOW);
             turnRelayOff();
           }
 
@@ -1130,7 +1133,6 @@ void turnoff()
   afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
   t_relay.stop(afterStart);
   if (standbyPeriod >= 5000) {
-    // turnrelay_onoff(LOW);
     turnRelayOff();
     Serial.println("Timer Stop: RELAY1 OFF");
   }
@@ -1493,8 +1495,7 @@ BLYNK_WRITE(V3)
       turnRelay2Off();
       #endif
       if (afterStart2 != -1) {
-            t_relay2.stop(afterStart2);
-
+        t_relay2.stop(afterStart2);
       }
       if (afterStop2 != -1) {
         t_delayStart2.stop(afterStop2);
