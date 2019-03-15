@@ -51,6 +51,8 @@ SOFTWARE.
   MLEDScroll matrix;
 #endif
 
+#define RELAYACTIVELOW
+
 #include "ogoswitch.h"
 #include <SPI.h>
 #include <SD.h>
@@ -95,7 +97,13 @@ const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
   String firmware_name = "Incubator.ino.d1_minipro";
 #endif
 
-
+#ifdef RELAYACTIVELOW
+  #define OFF  HIGH
+  #define ON  LOW
+#else
+  #define OFF  LOW
+  #define ON  HIGH
+#endif
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
@@ -231,10 +239,10 @@ void setup()
   pinMode(LED, OUTPUT);
   pinMode(analogReadPin, INPUT);
   pinMode(RELAY1, OUTPUT);
-  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY1, OFF);
   #ifdef SECONDRELAY
   pinMode(RELAY2, OUTPUT);
-  digitalWrite(RELAY2, LOW);
+  digitalWrite(RELAY2, OFF);
   #endif
 
 
@@ -689,7 +697,7 @@ void soilMoistureSensor()
 
   if (mappedValue > soilMoistureLevel) {  // soilMoistureLevel define in ogoswitch.h, default = 50
     Serial.println("High Moisture");
-    if (digitalRead(RELAY1) == HIGH) {
+    if (digitalRead(RELAY1) == ON) {
       Serial.println("Soil Moisture mode: Turn Relay Off");
       turnRelayOff();
       delay(300);
@@ -700,7 +708,7 @@ void soilMoistureSensor()
   }
   else {
     Serial.println("Low Moisture");
-    if (digitalRead(RELAY1) == LOW) {
+    if (digitalRead(RELAY1) == OFF) {
       Serial.println("Soil Moisture mode: Turn Relay On");
       turnRelayOn();
       delay(300);
@@ -839,7 +847,7 @@ void readSensor()
             afterStart = -1;
           }
           Serial.println("OFF");
-          if (digitalRead(RELAY1) == HIGH) {
+          if (digitalRead(RELAY1) == ON) {
             turnRelayOff();
           }
 
@@ -880,7 +888,7 @@ void readSensor()
               afterStart = -1;
             }
             Serial.println("OFF");
-            if (digitalRead(RELAY1) == HIGH) {
+            if (digitalRead(RELAY1) == ON) {
               turnRelayOff();
             }
 
@@ -897,7 +905,7 @@ void readSensor()
             }
             Serial.println("OFF");
             #ifdef SECONDRELAY
-            if (digitalRead(RELAY2) == HIGH) {
+            if (digitalRead(RELAY2) == ON) {
               
               turnRelay2Off();
               
@@ -928,7 +936,7 @@ void readSensor()
             afterStart = -1;
           }
           Serial.println("OFF");
-          if (digitalRead(RELAY1) == HIGH) {
+          if (digitalRead(RELAY1) == ON) {
             turnRelayOff();
           }
 
@@ -1098,7 +1106,7 @@ void displayTemperature()
 
 void turnRelayOn()
 {
-  digitalWrite(RELAY1, HIGH);
+  digitalWrite(RELAY1, ON);
   Serial.println("RELAY1 ON");
   digitalWrite(LED_BUILTIN, LOW);  // turn on
   led1.on();
@@ -1108,7 +1116,7 @@ void turnRelayOn()
 
 void turnRelayOff()
 {
-  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY1, OFF);
   Serial.println("RELAY1 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
   led1.off();
@@ -1119,7 +1127,7 @@ void turnRelayOff()
 #ifdef SECONDRELAY
 void turnRelay2On()
 {
-  digitalWrite(RELAY2, HIGH);
+  digitalWrite(RELAY2, ON);
   Serial.println("RELAY2 ON");
   digitalWrite(LED_BUILTIN, LOW);  // turn on
   led3.on();
@@ -1129,7 +1137,7 @@ void turnRelay2On()
 
 void turnRelay2Off()
 {
-  digitalWrite(RELAY2, LOW);
+  digitalWrite(RELAY2, OFF);
   Serial.println("RELAY2 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
   led3.off();
@@ -1401,7 +1409,7 @@ void onConnected(char *attribute, uint8_t* msg, unsigned int msglen)
 
 BLYNK_WRITE(V0)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
+  int pinValue = param.asInt(); // assigning incoming value from pin V0 to a variable
 
   // process received value
   Serial.print("Pin Value : ");
@@ -1452,10 +1460,10 @@ BLYNK_WRITE(V1)
 
   if(!AUTO) {
     if (pinValue == 1) {
-      Blynk.virtualWrite(V0, 1);
+      Blynk.virtualWrite(V1, 1);
     }
     else {
-      Blynk.virtualWrite(V0, 0);
+      Blynk.virtualWrite(V1, 0);
     }
   }
   else {
@@ -1488,7 +1496,7 @@ BLYNK_WRITE(V2)
 
 BLYNK_WRITE(V3)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
+  int pinValue = param.asInt(); // assigning incoming value from pin V3 to a variable
 
   // process received value
   Serial.print("Pin Value : ");
@@ -1519,7 +1527,7 @@ BLYNK_WRITE(V3)
   }
   else {
     Serial.println("auto mode!");
-    if(RelayEvent) {
+    if(Relay2Event) {
       Blynk.virtualWrite(V3, 1);
     }
     else {
