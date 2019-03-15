@@ -44,7 +44,7 @@ SOFTWARE.
 #define BLYNKLOCAL
 // #define THINGSPEAK
 // #define
-// #define SECONDRELAY
+#define SECONDRELAY
 
 #ifdef MATRIXLED
   #include <MLEDScroll.h>
@@ -134,11 +134,11 @@ const int chipSelect = D8;                  // SD CARD
 #endif
 
 
-#ifdef SECONDRELAY && !defined(MATRIXLED)
+#ifdef SECONDRELAY
 const int RELAY1 = D7;
 const int RELAY2 = D6;
 #else
-const int RELAY1 = D6;
+const int RELAY1 = D7;
 #endif
 
 
