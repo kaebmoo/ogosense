@@ -44,12 +44,14 @@ SOFTWARE.
 #define BLYNKLOCAL
 // #define THINGSPEAK
 // #define
-#define SECONDRELAY
+// #define SECONDRELAY
 
 #ifdef MATRIXLED
   #include <MLEDScroll.h>
   MLEDScroll matrix;
 #endif
+
+#define RELAYACTIVELOW
 
 #include "ogoswitch.h"
 #include <SPI.h>
@@ -88,20 +90,26 @@ ESP8266HTTPUpdateServer httpUpdater;
 const int FW_VERSION = 10;  // 2018 11 13 version 10 fixed bug 
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
+  String firmware_name = "Incubator.ino.d1_mini";
 #elif ARDUINO_ESP8266_WEMOS_D1MINILITE
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minilite";
+  String firmware_name = "Incubator.ino.d1_minilite";
 #elif ARDUINO_ESP8266_WEMOS_D1MINIPRO
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minipro";
+  String firmware_name = "Incubator.ino.d1_minipro";
 #endif
 
-
+#ifdef RELAYACTIVELOW
+  #define OFF  HIGH
+  #define ON  LOW
+#else
+  #define OFF  LOW
+  #define ON  HIGH
+#endif
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 360709;
-char *readAPIKey = "GNZ8WEU763Z5DUEA";
-char *writeAPIKey = "8M07EYX8NPCD9V8U";
+unsigned long channelID = 470917;
+char *readAPIKey = "OVKF7VWLWY3VIST1";
+char *writeAPIKey = "UMJJIQOM7ZTQCMJ5";
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
@@ -134,11 +142,11 @@ const int chipSelect = D8;                  // SD CARD
 #endif
 
 
-#ifdef SECONDRELAY
+#ifdef SECONDRELAY && !defined(MATRIXLED)
 const int RELAY1 = D7;
 const int RELAY2 = D6;
-#else
-const int RELAY1 = D7;
+// #else
+// const int RELAY1 = D6;
 #endif
 
 
@@ -161,8 +169,8 @@ float humidity_setpoint = HUMIDITY_SETPOINT;     // 60 set point RH %
 float humidity_range = HUMIDITY_RANGE;          // +- 20 from set point
 
 // set for wifimanager to get value from user
-char t_setpoint[6] = "30";
-char t_range[6] = "2";
+char t_setpoint[6] = "37.5";
+char t_range[6] = "0.5";
 char h_setpoint[6] = "60";
 char h_range[6] = "5";
 char c_options[6] = "1";
@@ -193,7 +201,7 @@ int ledState = LOW;
 unsigned long previousMillis = 0;
 
 const unsigned long onPeriod = 60L * 60L * 1000L;       // ON relay period minute * second * milli second
-const unsigned long standbyPeriod = 300L * 1000L;       // delay start timer for relay
+const unsigned long standbyPeriod = 1L * 1000L;       // delay start timer for relay
 
 // flag for saving data
 bool shouldSaveConfig = false;
@@ -231,10 +239,10 @@ void setup()
   pinMode(LED, OUTPUT);
   pinMode(analogReadPin, INPUT);
   pinMode(RELAY1, OUTPUT);
-  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY1, OFF);
   #ifdef SECONDRELAY
   pinMode(RELAY2, OUTPUT);
-  digitalWrite(RELAY2, LOW);
+  digitalWrite(RELAY2, OFF);
   #endif
 
 
@@ -281,8 +289,10 @@ void setup()
   EEPROM.begin(512);
   humidity_setpoint = (float) eeGetInt(0);
   humidity_range = (float) eeGetInt(4);
-  temperature_setpoint = (float) eeGetInt(8);
-  temperature_range = (float) eeGetInt(12);
+  // temperature_setpoint = (float) EEPROMReadlong(8);
+  // temperature_range = (float) EEPROMReadlong(12);
+  EEPROM.get(8, temperature_setpoint);
+  EEPROM.get(12, temperature_range);
   options = eeGetInt(16);
   COOL = eeGetInt(20);
   MOISTURE = eeGetInt(24);
@@ -291,12 +301,19 @@ void setup()
   readEEPROM(auth, 60, 32);
   channelID = (unsigned long) EEPROMReadlong(92);
 
+  Serial.println();
+  Serial.println("Reading config.");
+  Serial.print("Temperature : ");
+  Serial.println(temperature_setpoint);
+  Serial.print("Temperature Range : ");
+  Serial.println(temperature_range);
+
   int saved = eeGetInt(500);
   if (saved == 6550) {
     dtostrf(humidity_setpoint, 2, 0, h_setpoint);
     dtostrf(humidity_range, 2, 0, h_range);
-    dtostrf(temperature_setpoint, 2, 0, t_setpoint);
-    dtostrf(temperature_range, 2, 0, t_range);
+    dtostrf(temperature_setpoint, 2, 2, t_setpoint);
+    dtostrf(temperature_range, 2, 2, t_range);
     itoa(options, c_options, 10);
     itoa(COOL, c_cool, 10);
     itoa(MOISTURE, c_moisture, 10);
@@ -534,6 +551,7 @@ void autoWifiConnect()
   }
 
   Serial.println();
+  Serial.println("Before save config.");
   Serial.print("Temperature : ");
   Serial.println(temperature_setpoint);
   Serial.print("Temperature Range : ");
@@ -559,6 +577,7 @@ void autoWifiConnect()
 
 
   if (shouldSaveConfig) {
+    Serial.println();
     Serial.println("Saving config...");
     strcpy(t_setpoint, custom_t_setpoint.getValue());
     strcpy(t_range, custom_t_range.getValue());
@@ -572,8 +591,8 @@ void autoWifiConnect()
     strcpy(c_auth, custom_c_auth.getValue());
     strcpy(c_channelid, custom_c_channelid.getValue());
 
-    temperature_setpoint = atol(t_setpoint);
-    temperature_range = atol(t_range);
+    temperature_setpoint = atof(t_setpoint);
+    temperature_range = atof(t_range);
     humidity_setpoint = atol(h_setpoint);
     humidity_range = atol(h_range);
     options = atoi(c_options);
@@ -584,10 +603,11 @@ void autoWifiConnect()
     strcpy(auth, c_auth);
     channelID = (unsigned long) atol(c_channelid);
 
+    
     Serial.print("Temperature : ");
-    Serial.println(t_setpoint);
+    Serial.println(temperature_setpoint);
     Serial.print("Temperature Range : ");
-    Serial.println(t_range);
+    Serial.println(temperature_range);
     Serial.print("Humidity : ");
     Serial.println(h_setpoint);
     Serial.print("Humidity Range : ");
@@ -609,8 +629,11 @@ void autoWifiConnect()
 
     eeWriteInt(0, atoi(h_setpoint));
     eeWriteInt(4, atoi(h_range));
-    eeWriteInt(8, atoi(t_setpoint));
-    eeWriteInt(12, atoi(t_range));
+    // EEPROMWritelong(8, t_setpoint);
+    // EEPROMWritelong(12, t_range);
+    EEPROM.put(8, temperature_setpoint);
+    EEPROM.put(12, temperature_range);
+    EEPROM.commit();
     eeWriteInt(16, options);
     eeWriteInt(20, COOL);
     eeWriteInt(24, MOISTURE);
@@ -674,7 +697,7 @@ void soilMoistureSensor()
 
   if (mappedValue > soilMoistureLevel) {  // soilMoistureLevel define in ogoswitch.h, default = 50
     Serial.println("High Moisture");
-    if (digitalRead(RELAY1) == HIGH) {
+    if (digitalRead(RELAY1) == ON) {
       Serial.println("Soil Moisture mode: Turn Relay Off");
       turnRelayOff();
       delay(300);
@@ -685,7 +708,7 @@ void soilMoistureSensor()
   }
   else {
     Serial.println("Low Moisture");
-    if (digitalRead(RELAY1) == LOW) {
+    if (digitalRead(RELAY1) == OFF) {
       Serial.println("Soil Moisture mode: Turn Relay On");
       turnRelayOn();
       delay(300);
@@ -813,9 +836,8 @@ void readSensor()
         if (tempon == true && humion == true) {
           if (RelayEvent == false) {
             afterStart = t_relay.after(onPeriod, turnoff);
-            Serial.println("On Timer Start.");
-            RelayEvent = true;
-            // turnrelay_onoff(HIGH);
+            Serial.println("Turn On.");
+            RelayEvent = true;            
             turnRelayOn();
           }
         }
@@ -825,8 +847,7 @@ void readSensor()
             afterStart = -1;
           }
           Serial.println("OFF");
-          if (digitalRead(RELAY1) == HIGH) {
-            // turnrelay_onoff(LOW);
+          if (digitalRead(RELAY1) == ON) {
             turnRelayOff();
           }
 
@@ -867,7 +888,7 @@ void readSensor()
               afterStart = -1;
             }
             Serial.println("OFF");
-            if (digitalRead(RELAY1) == HIGH) {
+            if (digitalRead(RELAY1) == ON) {
               turnRelayOff();
             }
 
@@ -884,7 +905,7 @@ void readSensor()
             }
             Serial.println("OFF");
             #ifdef SECONDRELAY
-            if (digitalRead(RELAY2) == HIGH) {
+            if (digitalRead(RELAY2) == ON) {
               
               turnRelay2Off();
               
@@ -915,7 +936,7 @@ void readSensor()
             afterStart = -1;
           }
           Serial.println("OFF");
-          if (digitalRead(RELAY1) == HIGH) {
+          if (digitalRead(RELAY1) == ON) {
             turnRelayOff();
           }
 
@@ -1085,7 +1106,7 @@ void displayTemperature()
 
 void turnRelayOn()
 {
-  digitalWrite(RELAY1, HIGH);
+  digitalWrite(RELAY1, ON);
   Serial.println("RELAY1 ON");
   digitalWrite(LED_BUILTIN, LOW);  // turn on
   led1.on();
@@ -1095,7 +1116,7 @@ void turnRelayOn()
 
 void turnRelayOff()
 {
-  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY1, OFF);
   Serial.println("RELAY1 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
   led1.off();
@@ -1106,7 +1127,7 @@ void turnRelayOff()
 #ifdef SECONDRELAY
 void turnRelay2On()
 {
-  digitalWrite(RELAY2, HIGH);
+  digitalWrite(RELAY2, ON);
   Serial.println("RELAY2 ON");
   digitalWrite(LED_BUILTIN, LOW);  // turn on
   led3.on();
@@ -1116,7 +1137,7 @@ void turnRelay2On()
 
 void turnRelay2Off()
 {
-  digitalWrite(RELAY2, LOW);
+  digitalWrite(RELAY2, OFF);
   Serial.println("RELAY2 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
   led3.off();
@@ -1130,7 +1151,6 @@ void turnoff()
   afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
   t_relay.stop(afterStart);
   if (standbyPeriod >= 5000) {
-    // turnrelay_onoff(LOW);
     turnRelayOff();
     Serial.println("Timer Stop: RELAY1 OFF");
   }
@@ -1389,7 +1409,7 @@ void onConnected(char *attribute, uint8_t* msg, unsigned int msglen)
 
 BLYNK_WRITE(V0)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
+  int pinValue = param.asInt(); // assigning incoming value from pin V0 to a variable
 
   // process received value
   Serial.print("Pin Value : ");
@@ -1440,10 +1460,10 @@ BLYNK_WRITE(V1)
 
   if(!AUTO) {
     if (pinValue == 1) {
-      Blynk.virtualWrite(V0, 1);
+      Blynk.virtualWrite(V1, 1);
     }
     else {
-      Blynk.virtualWrite(V0, 0);
+      Blynk.virtualWrite(V1, 0);
     }
   }
   else {
@@ -1476,7 +1496,7 @@ BLYNK_WRITE(V2)
 
 BLYNK_WRITE(V3)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
+  int pinValue = param.asInt(); // assigning incoming value from pin V3 to a variable
 
   // process received value
   Serial.print("Pin Value : ");
@@ -1493,8 +1513,7 @@ BLYNK_WRITE(V3)
       turnRelay2Off();
       #endif
       if (afterStart2 != -1) {
-            t_relay2.stop(afterStart2);
-
+        t_relay2.stop(afterStart2);
       }
       if (afterStop2 != -1) {
         t_delayStart2.stop(afterStop2);
@@ -1508,7 +1527,7 @@ BLYNK_WRITE(V3)
   }
   else {
     Serial.println("auto mode!");
-    if(RelayEvent) {
+    if(Relay2Event) {
       Blynk.virtualWrite(V3, 1);
     }
     else {
@@ -1605,7 +1624,7 @@ BLYNK_WRITE(V69)
 
 BLYNK_WRITE(V24)
 {
-  int stepperValue = param.asInt();
+  float stepperValue = param.asFloat();
 
   Serial.print("Temperature setpoint: ");
   Serial.println(stepperValue);
@@ -1615,7 +1634,7 @@ BLYNK_WRITE(V24)
 
 BLYNK_WRITE(V25)
 {
-  int stepperValue = param.asInt();
+  float stepperValue = param.asFloat();
 
   Serial.print("Temperature range: ");
   Serial.println(stepperValue);
