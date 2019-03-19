@@ -1,7 +1,7 @@
 /*
   MIT License
-Version 1.0 2018-01-22
-Copyright (c) 2017 kaebmoo gmail com
+Version 1.0 2019-03-19
+Copyright (c) 2019 kaebmoo gmail com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,10 +24,11 @@ SOFTWARE.
 
 /*
  * Hardware
- * Wemos D1 mini, Pro
- * Wemos SHT30 Shield use D1, D2 pin
- * Wemos Relay Shield use D6, D7
- * dot matrix LED // use D5, D7
+ * Wemos D1 mini, Pro                     https://wiki.wemos.cc/products:d1:d1_mini
+ * Wemos SHT30 Shield use D1, D2 pin      https://wiki.wemos.cc/products:d1_mini_shields:sht30_shield
+ * Wemos Relay Shield use D6              https://wiki.wemos.cc/products:d1_mini_shields:relay_shield
+ * dot matrix LED // use D5, D7           https://wiki.wemos.cc/products:d1_mini_shields:matrix_led_shield
+ * Lolin Motor Shield I2C use D1, D2 pin  https://wiki.wemos.cc/products:d1_mini_shields:motor_shield
  *
  *
  */
@@ -80,6 +81,13 @@ SOFTWARE.
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
+#include <Wire.h>
+#include <LOLIN_I2C_MOTOR.h>
+
+LOLIN_I2C_MOTOR motor; //I2C address 0x30
+// LOLIN_I2C_MOTOR motor(DEFAULT_I2C_MOTOR_ADDRESS); //I2C address 0x30
+// LOLIN_I2C_MOTOR motor(your_address); //using customize I2C address
+
 
 const char* host = "ogosense-webupdate";
 const char* update_path = "/firmware";
@@ -87,7 +95,7 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 10;  // 2018 11 13 version 10 fixed bug 
+const int FW_VERSION = 10;  // 2018 11 13 version 10 fixed bug
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
   String firmware_name = "Incubator.ino.d1_mini";
@@ -209,12 +217,15 @@ bool shouldSaveConfig = false;
 BlynkTimer blynkTimer, checkConnectionTimer;
 Timer t_relay, t_delayStart, t_readSensor, t_checkFirmware;         // timer for ON period and delay start
 Timer t_relay2, t_delayStart2;
+Timer timerMotor;
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
 bool Relay2Event = false;
 int afterStart2 = -1;
 int afterStop2 = -1;
+long motorDelayTime = 21600000;   // 6 hours
+bool flagToggleMotor = false;
 
 #ifdef SLEEP
   // sleep for this many seconds
@@ -234,6 +245,13 @@ void setup()
   Serial.begin(115200);
   Serial.println();
   Serial.println("starting");
+
+  Serial.println("Motor Shield Testing...");
+
+  while (motor.PRODUCT_ID != PRODUCT_ID_I2C_MOTOR) //wait motor shield ready.
+  {
+    motor.getInfo();
+  }
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(LED, OUTPUT);
@@ -300,6 +318,7 @@ void setup()
   readEEPROM(readAPIKey, 44, 16);
   readEEPROM(auth, 60, 32);
   channelID = (unsigned long) EEPROMReadlong(92);
+  EEPROM.get(400, flagToggleMotor);
 
   Serial.println();
   Serial.println("Reading config.");
@@ -331,7 +350,7 @@ void setup()
   httpUpdater.setup(&httpServer, update_path, update_username, update_password);
   httpServer.begin();
   MDNS.addService("http", "tcp", 80);
-  Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);  
+  Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);
 
   Serial.print("blynk auth token: ");
   Serial.println(auth);
@@ -363,8 +382,8 @@ void setup()
     microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
     microgear.connect(APPID);
   #endif
-  
-  
+
+
   // Setup a function to be called every second
   // gauge1Push_reset = blynkTimer.setInterval(4000L, displayTemperature);
   // gauge2Push_reset = blynkTimer.setInterval(4000L, displayHumidity);
@@ -386,7 +405,7 @@ void setup()
   #endif
 
 
-
+  timerMotor.every(motorDelayTime, fliptheEgg);
   t_readSensor.every(5000, readSensor);                       // read sensor data and make decision
   #ifdef THINGSPEAK
   blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
@@ -449,6 +468,7 @@ void loop() {
   t_checkFirmware.update();
   //t_displayTemperature.update();
   //t_displayHumidity.update();
+  timerMotor.update();
 
 }
 
@@ -603,7 +623,7 @@ void autoWifiConnect()
     strcpy(auth, c_auth);
     channelID = (unsigned long) atol(c_channelid);
 
-    
+
     Serial.print("Temperature : ");
     Serial.println(temperature_setpoint);
     Serial.print("Temperature Range : ");
@@ -662,7 +682,7 @@ float checkBattery()
 {
   unsigned int raw = 0;
   float volt = 0.0;
-    
+
   raw = analogRead(A0);
   volt = raw * (3.7 / 1023.0);
   // volt = volt * 4.2;
@@ -837,7 +857,7 @@ void readSensor()
           if (RelayEvent == false) {
             afterStart = t_relay.after(onPeriod, turnoff);
             Serial.println("Turn On.");
-            RelayEvent = true;            
+            RelayEvent = true;
             turnRelayOn();
           }
         }
@@ -906,9 +926,9 @@ void readSensor()
             Serial.println("OFF");
             #ifdef SECONDRELAY
             if (digitalRead(RELAY2) == ON) {
-              
+
               turnRelay2Off();
-              
+
             }
             #endif
 
@@ -1327,7 +1347,29 @@ void write_datalogger(String dataString) {
   }
 }
 
+void fliptheEgg()
+{
+  motor.changeFreq(MOTOR_CH_BOTH, 1000); //Change A & B 's Frequency to 1000Hz.
+  motor.changeDuty(MOTOR_CH_BOTH, 100);
 
+  if (flagToggleMotor == false) {
+    // motor CW
+
+  }
+  else {
+    // motor CCW
+
+  }
+  Serial.println();
+  Serial.print("Flag toggle motor: ");
+  Serial.println(flagToggleMotor);
+  flagToggleMotor = !flagToggleMotor;
+
+  Serial.print("Flag toggle motor (after flip): ");
+  Serial.println(flagToggleMotor);
+  EEPROM.put(400, flagToggleMotor);
+  EEPROM.commit();
+}
 
 void blink()
 {
@@ -1551,7 +1593,7 @@ BLYNK_WRITE(V19)
     case 1: // Item 1
       Serial.println("Item 1 selected (humidity)");
       options = 0;
-      Blynk.virtualWrite(V22, 0);   // backward compatible 
+      Blynk.virtualWrite(V22, 0);   // backward compatible
       break;
     case 2: // Item 2
       Serial.println("Item 2 selected (temperature)");
@@ -1690,24 +1732,24 @@ BLYNK_READ(V6)
 BLYNK_CONNECTED()
 {
   bool relay1_status, relay2_status;
-  
+
   Serial.println("Blynk Sync.");
   // Blynk.syncAll();
 
   relay1_status = (0!=(*portOutputRegister( digitalPinToPort(RELAY1) ) & digitalPinToBitMask(RELAY1)));
   Blynk.virtualWrite(V0, relay1_status);
   Serial.print("Relay #1 status = "); Serial.println(relay1_status);
-  
+
   #ifdef SECONDRELAY
   relay2_status = (0!=(*portOutputRegister( digitalPinToPort(RELAY2) ) & digitalPinToBitMask(RELAY2)));
   Blynk.virtualWrite(V3, relay2_status);
   Serial.print("Relay #2 status = "); Serial.println(relay2_status);
   #endif
 
-  
-  
+
+
   if (relay1_status == 1) {
-    led1.on();  
+    led1.on();
   }
   else {
     led1.off();
