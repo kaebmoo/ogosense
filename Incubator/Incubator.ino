@@ -224,7 +224,7 @@ int afterStop = -1;
 bool Relay2Event = false;
 int afterStart2 = -1;
 int afterStop2 = -1;
-long motorDelayTime = 21600000;   // 6 hours
+long motorDelayTime = 21600000;   // 6 hours 21600000 ms
 bool flagToggleMotor = false;
 
 #ifdef SLEEP
@@ -1352,12 +1352,34 @@ void fliptheEgg()
   motor.changeFreq(MOTOR_CH_BOTH, 1000); //Change A & B 's Frequency to 1000Hz.
   motor.changeDuty(MOTOR_CH_BOTH, 100);
 
+  Serial.println();
+  Serial.println("MOTOR_STATUS_STOP");
+  motor.changeStatus(MOTOR_CH_A, MOTOR_STATUS_STOP);
+  motor.changeStatus(MOTOR_CH_B, MOTOR_STATUS_STOP);
+  delay(500);
+
   if (flagToggleMotor == false) {
     // motor CW
+    Serial.println("MOTOR_STATUS_CW");
+    motor.changeStatus(MOTOR_CH_A, MOTOR_STATUS_CW);
+    motor.changeStatus(MOTOR_CH_A, MOTOR_STATUS_CCW);
+    motor.changeStatus(MOTOR_CH_A, MOTOR_STATUS_CW);
+    motor.changeStatus(MOTOR_CH_A, MOTOR_STATUS_CCW);
+    motor.changeStatus(MOTOR_CH_A, MOTOR_STATUS_CW);
+    motor.changeStatus(MOTOR_CH_A, MOTOR_STATUS_CCW);
+    delay(500);
 
   }
   else {
     // motor CCW
+    Serial.println("MOTOR_STATUS_CCW");
+    motor.changeStatus(MOTOR_CH_B, MOTOR_STATUS_CCW);
+    motor.changeStatus(MOTOR_CH_B, MOTOR_STATUS_CW);
+    motor.changeStatus(MOTOR_CH_B, MOTOR_STATUS_CCW);
+    motor.changeStatus(MOTOR_CH_B, MOTOR_STATUS_CW);
+    motor.changeStatus(MOTOR_CH_B, MOTOR_STATUS_CCW);
+    motor.changeStatus(MOTOR_CH_B, MOTOR_STATUS_CW);
+    delay(500);
 
   }
   Serial.println();
