@@ -224,7 +224,7 @@ int afterStop = -1;
 bool Relay2Event = false;
 int afterStart2 = -1;
 int afterStop2 = -1;
-long motorDelayTime = 21600000;   // 6 hours 21600000 ms
+long motorDelayTime = 10800000;   // 6 hours 21600000 ms
 bool flagToggleMotor = false;
 
 #ifdef SLEEP
