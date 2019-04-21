@@ -37,7 +37,7 @@ SOFTWARE.
 // #define BLYNK_PRINT Serial
 
 // #define SLEEP
-#define MATRIXLED
+// #define MATRIXLED
 // #define SOILMOISTURE
 // #define EXTERNALSENSE
 
@@ -138,7 +138,7 @@ const int chipSelect = D8;                  // SD CARD
 const int RELAY1 = D7;
 const int RELAY2 = D6;
 #else
-const int RELAY1 = D6;
+const int RELAY1 = D7;
 #endif
 
 
