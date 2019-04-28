@@ -743,7 +743,8 @@ void readSensor()
   sensorStatus = getInternalSensor();
   #endif
 
-  Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
+  // Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
+  Serial.printf("Auto Mode: %u\n", AUTO);
   if(AUTO) {
     Serial.print("\tOptions : ");
     Serial.println(options);
@@ -1594,7 +1595,7 @@ BLYNK_WRITE(V22)
 
 BLYNK_WRITE(V69)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V23 to a variable
+  int pinValue = param.asInt(); // assigning incoming value from pin V69 to a variable
 
   if (pinValue == 1) {
     delay(500);
@@ -1699,7 +1700,8 @@ BLYNK_CONNECTED()
   else {
     led3.off();
   }
-  if (AUTO) {
+  Serial.print("AUTO mode: ");  Serial.println(AUTO);
+  if (AUTO == true) {
     Blynk.virtualWrite(V2, 1);
     led2.on();
   }
