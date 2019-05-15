@@ -352,7 +352,7 @@ void setup()
   // gauge1Push_reset = blynkTimer.setInterval(4000L, displayTemperature);
   // gauge2Push_reset = blynkTimer.setInterval(4000L, displayHumidity);
 
-  // ตั้งการส่งให้เหลื่อมกัน 2000ms
+  // Set the timer to overlap ตั้งการส่งให้เหลื่อมกัน 2000ms
   // blynkTimer.setTimeout(2000, OnceOnlyTask1); // Guage V5 temperature
   // blynkTimer.setTimeout(4000, OnceOnlyTask2); // Guage v6 humidity
 
