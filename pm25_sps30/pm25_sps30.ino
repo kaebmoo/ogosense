@@ -198,7 +198,17 @@ bool read_all();
 // create constructor
 SPS30 sps30;
 
+uint16_t minimum25, maximum25, minimum10, maximum10;
+int pm25[512], pm10[512];
+int averagePM25 = 0;
+int averagePM10 = 0;
+int avrpm25[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+int avrpm10[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+int minuteCount = 0;
+
+
 float   MassPM2;        // Mass Concentration PM2.5 [μg/m3]
+float MassPM10;
 BlynkTimer timer;
 
 void setup() {
@@ -269,6 +279,8 @@ void setup() {
   //Blynk.begin(auth, ssid, pass, "blynk-cloud.com", 80);
   //Blynk.begin(auth, ssid, pass, IPAddress(192,168,1,100), 8080);
   timer.setInterval(3000, readPM25);
+  timer.setTimeout(60000, initMaxMin);
+  timer.setInterval(300000, sendMaxMin);
 }
 
 void loop() {
@@ -281,6 +293,30 @@ void loop() {
 void readPM25()
 {
   read_all();
+
+  // Max Min Value
+  if (MassPM10 > maximum10) {
+      maximum10 = MassPM10;
+    }
+    if (MassPM10 < minimum10) {
+      minimum10 = MassPM10;
+    }
+    if (MassPM2 > maximum25) {
+      maximum25 = MassPM2;
+    }
+    if (MassPM2 < minimum25) {
+      minimum25 = MassPM2;
+  }  
+}
+
+
+void initMaxMin()
+{
+  minimum10 = MassPM10;
+  maximum10 = MassPM10;
+  minimum25 = MassPM2;
+  maximum25 = MassPM2;
+  sendMaxMin();
 }
 
 /**
@@ -385,6 +421,7 @@ bool read_all()
   Serial.print(val.PartSize);
   Serial.print(F("\n"));
   MassPM2 = val.MassPM2;
+  MassPM10 = val.MassPM10;
 }
 
 /**
@@ -435,8 +472,23 @@ void serialTrigger(char * mess)
     Serial.read();
 }
 
+void sendMaxMin()
+{
+  // uint16_t minimum25, maximum25, minimum10, maximum10;
+  Blynk.virtualWrite(21, minimum25);
+  Blynk.virtualWrite(22, maximum25);
+  Blynk.virtualWrite(23, minimum10);
+  Blynk.virtualWrite(24, maximum10);
+}
+
 BLYNK_READ(V1) // Widget in the app READs Virtal Pin V1 with the certain frequency
 {
   // This command writes pm2.5 to Virtual Pin V1
   Blynk.virtualWrite(1, MassPM2);
+}
+
+BLYNK_READ(V10) // Widget in the app READs Virtal Pin V10 with the certain frequency
+{
+  // This command writes pm10 to Virtual Pin V10
+  Blynk.virtualWrite(10, MassPM10);
 }

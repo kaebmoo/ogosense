@@ -25,11 +25,12 @@
 // SDM<9600> sdm;
 SDM sdm(Serial, 9600, NOT_A_PIN, SERIAL_8N1, false);
 
+
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 585496;
-char *readAPIKey = "5S8UD732WGE1UVO7";
-char *writeAPIKey = "D0T6TVCX48SBB9U5";
+unsigned long channelID = 793982;
+char *readAPIKey = "Z8ZXBL9MNNKNZGO6";
+char *writeAPIKey = "HCCO6Z2VMKPBAPZY";
 
 BlynkTimer blynkTimer;
 
