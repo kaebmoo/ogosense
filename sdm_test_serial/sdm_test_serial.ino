@@ -19,17 +19,18 @@
 #include <PubSubClient.h>
 
 #define THINGSBOARD
-#define WIFI_AP "Red"
-#define WIFI_PASSWORD "12345678"
+#define WIFI_AP "Red2"
+#define WIFI_PASSWORD "ogonan2019"
 
 // SDM<9600> sdm;
 SDM sdm(Serial, 9600, NOT_A_PIN, SERIAL_8N1, false);
 
+
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 585496;
-char *readAPIKey = "5S8UD732WGE1UVO7";
-char *writeAPIKey = "D0T6TVCX48SBB9U5";
+unsigned long channelID = 793982;
+char *readAPIKey = "Z8ZXBL9MNNKNZGO6";
+char *writeAPIKey = "HCCO6Z2VMKPBAPZY";
 
 BlynkTimer blynkTimer;
 
@@ -67,6 +68,8 @@ char *myRoom = "smartmeter/1";
 
 PubSubClient mqttClient(client);
 
+int task1Time, task2Time, task3Time;
+
 void setup() {
   pinMode(BUILTIN_LED, OUTPUT);
   digitalWrite(BUILTIN_LED, HIGH);
@@ -93,9 +96,16 @@ void setup() {
 
   ThingSpeak.begin( client );
   setupMqtt();
-  blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
-  blynkTimer.setInterval(5000L, readMeterData);
-  blynkTimer.setInterval(15000L, sendThingsBoard);
+  
+  task1Time = blynkTimer.setInterval(15000L, readMeterData);
+  task2Time = blynkTimer.setInterval(60000L, sendThingsBoard);
+  task3Time = blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
+
+  // Set the timer to overlap 5000ms
+  blynkTimer.setTimeout(5000, onceOnlyTask1);
+  blynkTimer.setTimeout(10000, onceOnlyTask2);
+  blynkTimer.setTimeout(15000, onceOnlyTask3);
+  
 }
 
 void loop() {
@@ -108,6 +118,22 @@ void loop() {
   mqttClient.loop();
   #endif
 }
+
+void onceOnlyTask1()
+{
+  blynkTimer.restartTimer(task1Time);
+}
+
+void onceOnlyTask2()
+{
+  blynkTimer.restartTimer(task2Time);
+}
+
+void onceOnlyTask3()
+{
+  blynkTimer.restartTimer(task3Time);
+}
+
 
 void readMeterData()
 {
