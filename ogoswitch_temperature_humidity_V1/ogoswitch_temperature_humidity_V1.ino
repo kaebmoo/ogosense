@@ -89,11 +89,11 @@ ESP8266HTTPUpdateServer httpUpdater;
 const int FW_VERSION = 10;  // 2018 11 13 version 10 fixed bug 
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
+  String firmware_name = "ogoswitch_temperature_humidity_V1.ino.d1_mini";
 #elif ARDUINO_ESP8266_WEMOS_D1MINILITE
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minilite";
+  String firmware_name = "ogoswitch_temperature_humidity_V1.ino.d1_minilite";
 #elif ARDUINO_ESP8266_WEMOS_D1MINIPRO
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minipro";
+  String firmware_name = "ogoswitch_temperature_humidity_V1.ino.d1_minipro";
 #endif
 
 
@@ -678,8 +678,7 @@ void soilMoistureSensor()
       Serial.println("Soil Moisture mode: Turn Relay Off");
       turnRelayOff();
       delay(300);
-      Blynk.virtualWrite(V0, 0);
-      // Blynk.syncVirtual(V0);
+      Blynk.virtualWrite(V1, 0);
       RelayEvent = false;
     }
   }
@@ -689,7 +688,7 @@ void soilMoistureSensor()
       Serial.println("Soil Moisture mode: Turn Relay On");
       turnRelayOn();
       delay(300);
-      Blynk.virtualWrite(V0, 1);
+      Blynk.virtualWrite(V1, 1);
       RelayEvent = true;
     }
   }
@@ -1089,7 +1088,7 @@ void turnRelayOn()
   Serial.println("RELAY1 ON");
   digitalWrite(LED_BUILTIN, LOW);  // turn on
   led1.on();
-  Blynk.virtualWrite(V0, 1);
+  Blynk.virtualWrite(V1, 1);
   buzzer_sound();
 }
 
@@ -1099,7 +1098,7 @@ void turnRelayOff()
   Serial.println("RELAY1 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
   led1.off();
-  Blynk.virtualWrite(V0, 0);
+  Blynk.virtualWrite(V1, 0);
   buzzer_sound();
 }
 
@@ -1387,7 +1386,7 @@ void onConnected(char *attribute, uint8_t* msg, unsigned int msglen)
 }
 #endif
 
-BLYNK_WRITE(V0)
+BLYNK_WRITE(V1)
 {
   int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
 
@@ -1418,10 +1417,10 @@ BLYNK_WRITE(V0)
   else {
     Serial.println("auto mode!");
     if(RelayEvent) {
-      Blynk.virtualWrite(V0, 1);
+      Blynk.virtualWrite(V1, 1);
     }
     else {
-      Blynk.virtualWrite(V0, 0);
+      Blynk.virtualWrite(V1, 0);
     }
   }
 
@@ -1432,29 +1431,6 @@ BLYNK_WRITE(V0)
   Serial.print(" afterStop = ");
   Serial.println(afterStop);
 
-}
-
-BLYNK_WRITE(V1)
-{
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
-
-  if(!AUTO) {
-    if (pinValue == 1) {
-      Blynk.virtualWrite(V0, 1);
-    }
-    else {
-      Blynk.virtualWrite(V0, 0);
-    }
-  }
-  else {
-    Serial.println("auto mode!");
-    if(RelayEvent) {
-      Blynk.virtualWrite(V1, 1);
-    }
-    else {
-      Blynk.virtualWrite(V1, 0);
-    }
-  }
 }
 
 BLYNK_WRITE(V2)
@@ -1476,7 +1452,7 @@ BLYNK_WRITE(V2)
 
 BLYNK_WRITE(V3)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
+  int pinValue = param.asInt(); // assigning incoming value from pin V3 to a variable
 
   // process received value
   Serial.print("Pin Value : ");
@@ -1676,7 +1652,7 @@ BLYNK_CONNECTED()
   // Blynk.syncAll();
 
   relay1_status = (0!=(*portOutputRegister( digitalPinToPort(RELAY1) ) & digitalPinToBitMask(RELAY1)));
-  Blynk.virtualWrite(V0, relay1_status);
+  Blynk.virtualWrite(V1, relay1_status);
   Serial.print("Relay #1 status = "); Serial.println(relay1_status);
   
   #ifdef SECONDRELAY
@@ -1706,7 +1682,7 @@ BLYNK_CONNECTED()
   else {
     Blynk.virtualWrite(V2, 0);
     led2.off();
-    Blynk.syncVirtual(V0);
+    Blynk.syncVirtual(V1);
     Blynk.syncVirtual(V3);
   }
   Blynk.syncVirtual(V19);
