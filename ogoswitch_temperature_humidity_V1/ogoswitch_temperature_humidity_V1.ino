@@ -42,7 +42,8 @@ SOFTWARE.
 // #define EXTERNALSENSE
 
 // #define BLYNKLOCAL
-#define THINGSPEAK
+#define BLYNK
+// #define THINGSPEAK
 // #define
 // #define SECONDRELAY
 
@@ -54,6 +55,7 @@ SOFTWARE.
 #include "ogoswitch.h"
 #include <SPI.h>
 #include <SD.h>
+
 #include <ThingSpeak.h>
 #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
 #include <BlynkSimpleEsp8266.h>
@@ -84,27 +86,27 @@ const char* update_username = "admin";
 const char* update_password = "ogosense";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-const int FW_VERSION = 10;  // 2018 11 13 version 10 fixed bug
+const int FW_VERSION = 10;  // 2018 11 13 version 10 fixed bug 
 const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINI
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_mini";
+  String firmware_name = "ogoswitch_temperature_humidity_V1.ino.d1_mini";
 #elif ARDUINO_ESP8266_WEMOS_D1MINILITE
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minilite";
+  String firmware_name = "ogoswitch_temperature_humidity_V1.ino.d1_minilite";
 #elif ARDUINO_ESP8266_WEMOS_D1MINIPRO
-  String firmware_name = "ogoswitch_temperature_humidity_nodisplay.ino.d1_minipro";
+  String firmware_name = "ogoswitch_temperature_humidity_V1.ino.d1_minipro";
 #endif
 
 
 
 // ThingSpeak information
-// char thingSpeakAddress[] = "api.thingspeak.com";
+char thingSpeakAddress[] = "api.thingspeak.com";
 unsigned long channelID = 360709;
-char readAPIKey[17] = "GNZ8WEU763Z5DUEA";
-char writeAPIKey[17] = "8M07EYX8NPCD9V8U";
+char *readAPIKey = "GNZ8WEU763Z5DUEA";
+char *writeAPIKey = "8M07EYX8NPCD9V8U";
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
-char auth[33] = "XXXXXXXXXXed4061bb4e0dXXXXXXXXXX";
+char auth[] = "XXXXXXXXXXed4061bb4e0dXXXXXXXXXX";
 bool blynkConnectedResult = false;
 int blynkreconnect = 0;
 
@@ -154,10 +156,10 @@ float maxhumidity = HUMIDITY_SETPOINT;
 float minhumidity = HUMIDITY_SETPOINT - HUMIDITY_RANGE;
 
 float temperature_setpoint = TEMPERATURE_SETPOINT;  // 30.0 set point
-float temperature_range = TEMPERATURE_RANGE;      // +- 2.0 from set point
+float temperature_range = TEMPERATURE_RANGE;      // +- 4.0 from set point
 
 float humidity_setpoint = HUMIDITY_SETPOINT;     // 60 set point RH %
-float humidity_range = HUMIDITY_RANGE;          // +- 5 from set point
+float humidity_range = HUMIDITY_RANGE;          // +- 20 from set point
 
 // set for wifimanager to get value from user
 char t_setpoint[6] = "30";
@@ -217,9 +219,11 @@ int afterStop2 = -1;
 
 void setup()
 {
-  int saved;
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  // WiFiManager wifiManager;
+  // String APName;
 
-  EEPROM.begin(512);
   Serial.begin(115200);
   Serial.println();
   Serial.println("starting");
@@ -275,8 +279,7 @@ void setup()
 
 
   // read config from eeprom
-
-  /*
+  EEPROM.begin(512);
   humidity_setpoint = (float) eeGetInt(0);
   humidity_range = (float) eeGetInt(4);
   temperature_setpoint = (float) eeGetInt(8);
@@ -284,54 +287,12 @@ void setup()
   options = eeGetInt(16);
   COOL = eeGetInt(20);
   MOISTURE = eeGetInt(24);
-  readEEPROM(writeAPIKey, 28, 17);
-  readEEPROM(readAPIKey, 45, 17);
-  readEEPROM(auth, 62, 33);
-  channelID = (unsigned long) EEPROMReadlong(95);
-  */
+  readEEPROM(writeAPIKey, 28, 16);
+  readEEPROM(readAPIKey, 44, 16);
+  readEEPROM(auth, 60, 32);
+  channelID = (unsigned long) EEPROMReadlong(92);
 
-
-
-  EEPROM.get(0, humidity_setpoint);
-  EEPROM.get(4, humidity_range);
-  EEPROM.get(8, temperature_setpoint);
-  EEPROM.get(12,temperature_range);
-  EEPROM.get(16, options);
-  EEPROM.get(20, COOL);
-  EEPROM.get(24, MOISTURE);
-  EEPROM.get(28, writeAPIKey); // 28 + 17
-  EEPROM.get(45, readAPIKey);
-  EEPROM.get(62, auth);
-  EEPROM.get(95, channelID);
-  EEPROM.get(500, saved);
-
-
-  Serial.println();
-  Serial.println("Configuration Read");
-  Serial.print("Temperature : ");
-  Serial.println(temperature_setpoint);
-  Serial.print("Temperature Range : ");
-  Serial.println(temperature_range);
-  Serial.print("Humidity : ");
-  Serial.println(humidity_setpoint);
-  Serial.print("Humidity Range : ");
-  Serial.println(humidity_range);
-  Serial.print("Option : ");
-  Serial.println(options);
-  Serial.print("COOL : ");
-  Serial.println(COOL);
-  Serial.print("MOISTURE : ");
-  Serial.println(MOISTURE);
-  Serial.print("Write API Key : ");
-  Serial.println(writeAPIKey);
-  Serial.print("Read API Key : ");
-  Serial.println(readAPIKey);
-  Serial.print("Channel ID : ");
-  Serial.println(channelID);
-  Serial.print("auth token : ");
-  Serial.println(auth);
-
-  // int saved = eeGetInt(500);
+  int saved = eeGetInt(500);
   if (saved == 6550) {
     dtostrf(humidity_setpoint, 2, 0, h_setpoint);
     dtostrf(humidity_range, 2, 0, h_range);
@@ -354,7 +315,7 @@ void setup()
   httpUpdater.setup(&httpServer, update_path, update_username, update_password);
   httpServer.begin();
   MDNS.addService("http", "tcp", 80);
-  Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);
+  Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser and login with username '%s' and password '%s'\n", host_update_name.c_str(), update_path, update_username, update_password);  
 
   Serial.print("blynk auth token: ");
   Serial.println(auth);
@@ -363,7 +324,7 @@ void setup()
   #else
     Blynk.config(auth);  // in place of Blynk.begin(auth, ssid, pass);
   #endif
-
+  
   #if defined(BLYNKLOCAL) || defined(BLYNK)
     blynkConnectedResult = Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk, 3333 is 10 seconds because Blynk.connect is in 3ms units.
     Serial.print("Blynk connect : ");
@@ -385,13 +346,13 @@ void setup()
     microgear.init(KEY,SECRET, (char *) ALIAS.c_str());
     microgear.connect(APPID);
   #endif
-
-
+  
+  
   // Setup a function to be called every second
   // gauge1Push_reset = blynkTimer.setInterval(4000L, displayTemperature);
   // gauge2Push_reset = blynkTimer.setInterval(4000L, displayHumidity);
 
-  // Set the timer to overlap ตั้งการส่งให้เหลื่อมกัน 2000ms
+  // ตั้งการส่งให้เหลื่อมกัน 2000ms
   // blynkTimer.setTimeout(2000, OnceOnlyTask1); // Guage V5 temperature
   // blynkTimer.setTimeout(4000, OnceOnlyTask2); // Guage v6 humidity
 
@@ -478,7 +439,6 @@ void autoWifiConnect()
 {
   WiFiManager wifiManager;
   String APName;
-  int saved = 6550;
 
   wifiManager.setBreakAfterConfig(true);
 
@@ -598,7 +558,7 @@ void autoWifiConnect()
   Serial.println(auth);
 
 
-  if (shouldSaveConfig) { //shouldSaveConfig
+  if (shouldSaveConfig) {
     Serial.println("Saving config...");
     strcpy(t_setpoint, custom_t_setpoint.getValue());
     strcpy(t_range, custom_t_range.getValue());
@@ -625,15 +585,15 @@ void autoWifiConnect()
     channelID = (unsigned long) atol(c_channelid);
 
     Serial.print("Temperature : ");
-    Serial.println(temperature_setpoint);
+    Serial.println(t_setpoint);
     Serial.print("Temperature Range : ");
-    Serial.println(temperature_range);
+    Serial.println(t_range);
     Serial.print("Humidity : ");
-    Serial.println(humidity_setpoint);
+    Serial.println(h_setpoint);
     Serial.print("Humidity Range : ");
-    Serial.println(humidity_range);
+    Serial.println(h_range);
     Serial.print("Option : ");
-    Serial.println(options);
+    Serial.println(c_options);
     Serial.print("COOL : ");
     Serial.println(COOL);
     Serial.print("MOISTURE : ");
@@ -647,35 +607,18 @@ void autoWifiConnect()
     Serial.print("auth token : ");
     Serial.println(auth);
 
-
-    eeWriteInt(0, humidity_setpoint);
-    eeWriteInt(4, humidity_range);
-    eeWriteInt(8, temperature_setpoint);
-    eeWriteInt(12, temperature_range);
+    eeWriteInt(0, atoi(h_setpoint));
+    eeWriteInt(4, atoi(h_range));
+    eeWriteInt(8, atoi(t_setpoint));
+    eeWriteInt(12, atoi(t_range));
     eeWriteInt(16, options);
     eeWriteInt(20, COOL);
     eeWriteInt(24, MOISTURE);
-    writeEEPROM(writeAPIKey, 28, 17);
-    writeEEPROM(readAPIKey, 45, 17);
-    writeEEPROM(auth, 62, 33);
-    EEPROMWritelong(95, (long) channelID);
-    eeWriteInt(500, saved);
-
-    /*
-    EEPROM.put(0, humidity_setpoint);
-    EEPROM.put(4, humidity_range);
-    EEPROM.put(8, temperature_setpoint);
-    EEPROM.put(12, temperature_range);
-    EEPROM.put(16, options);
-    EEPROM.put(20, COOL);
-    EEPROM.put(24, MOISTURE);
-    EEPROM.put(28, writeAPIKey);
-    EEPROM.put(45, readAPIKey);
-    EEPROM.put(62, auth);
-    EEPROM.put(95, channelID);
-    EEPROM.put(500, saved);
-    EEPROM.commit();
-    */
+    writeEEPROM(writeAPIKey, 28, 16);
+    writeEEPROM(readAPIKey, 44, 16);
+    writeEEPROM(auth, 60, 32);
+    EEPROMWritelong(92, (long) channelID);
+    eeWriteInt(500, 6550);
     shouldSaveConfig = false;
   }
 }
@@ -696,7 +639,7 @@ float checkBattery()
 {
   unsigned int raw = 0;
   float volt = 0.0;
-
+    
   raw = analogRead(A0);
   volt = raw * (3.7 / 1023.0);
   // volt = volt * 4.2;
@@ -735,8 +678,7 @@ void soilMoistureSensor()
       Serial.println("Soil Moisture mode: Turn Relay Off");
       turnRelayOff();
       delay(300);
-      Blynk.virtualWrite(V0, 0);
-      // Blynk.syncVirtual(V0);
+      Blynk.virtualWrite(V1, 0);
       RelayEvent = false;
     }
   }
@@ -746,7 +688,7 @@ void soilMoistureSensor()
       Serial.println("Soil Moisture mode: Turn Relay On");
       turnRelayOn();
       delay(300);
-      Blynk.virtualWrite(V0, 1);
+      Blynk.virtualWrite(V1, 1);
       RelayEvent = true;
     }
   }
@@ -800,8 +742,7 @@ void readSensor()
   sensorStatus = getInternalSensor();
   #endif
 
-  // Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
-  Serial.printf("Auto Mode: %u\n", AUTO);
+  Serial.printf("loop heap size: %u\n", ESP.getFreeHeap());
   if(AUTO) {
     Serial.print("\tOptions : ");
     Serial.println(options);
@@ -943,9 +884,9 @@ void readSensor()
             Serial.println("OFF");
             #ifdef SECONDRELAY
             if (digitalRead(RELAY2) == HIGH) {
-
+              
               turnRelay2Off();
-
+              
             }
             #endif
 
@@ -1147,7 +1088,7 @@ void turnRelayOn()
   Serial.println("RELAY1 ON");
   digitalWrite(LED_BUILTIN, LOW);  // turn on
   led1.on();
-  Blynk.virtualWrite(V0, 1);
+  Blynk.virtualWrite(V1, 1);
   buzzer_sound();
 }
 
@@ -1157,7 +1098,7 @@ void turnRelayOff()
   Serial.println("RELAY1 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
   led1.off();
-  Blynk.virtualWrite(V0, 0);
+  Blynk.virtualWrite(V1, 0);
   buzzer_sound();
 }
 
@@ -1227,11 +1168,9 @@ void delayStart2()
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
-  Serial.print("Should save config: ");
+  Serial.println("Should save config");
   shouldSaveConfig = true;
-  Serial.println(shouldSaveConfig);
 }
-
 
 void eeWriteInt(int pos, int val) {
     byte* p = (byte*) &val;
@@ -1314,7 +1253,6 @@ void writeEEPROM(char* buff, int offset, int len) {
     }
     EEPROM.commit();
 }
-
 
 
 int init_sdcard()
@@ -1448,7 +1386,7 @@ void onConnected(char *attribute, uint8_t* msg, unsigned int msglen)
 }
 #endif
 
-BLYNK_WRITE(V0)
+BLYNK_WRITE(V1)
 {
   int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
 
@@ -1479,10 +1417,10 @@ BLYNK_WRITE(V0)
   else {
     Serial.println("auto mode!");
     if(RelayEvent) {
-      Blynk.virtualWrite(V0, 1);
+      Blynk.virtualWrite(V1, 1);
     }
     else {
-      Blynk.virtualWrite(V0, 0);
+      Blynk.virtualWrite(V1, 0);
     }
   }
 
@@ -1493,29 +1431,6 @@ BLYNK_WRITE(V0)
   Serial.print(" afterStop = ");
   Serial.println(afterStop);
 
-}
-
-BLYNK_WRITE(V1)
-{
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
-
-  if(!AUTO) {
-    if (pinValue == 1) {
-      Blynk.virtualWrite(V0, 1);
-    }
-    else {
-      Blynk.virtualWrite(V0, 0);
-    }
-  }
-  else {
-    Serial.println("auto mode!");
-    if(RelayEvent) {
-      Blynk.virtualWrite(V1, 1);
-    }
-    else {
-      Blynk.virtualWrite(V1, 0);
-    }
-  }
 }
 
 BLYNK_WRITE(V2)
@@ -1537,7 +1452,7 @@ BLYNK_WRITE(V2)
 
 BLYNK_WRITE(V3)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
+  int pinValue = param.asInt(); // assigning incoming value from pin V3 to a variable
 
   // process received value
   Serial.print("Pin Value : ");
@@ -1593,7 +1508,7 @@ BLYNK_WRITE(V19)
     case 1: // Item 1
       Serial.println("Item 1 selected (humidity)");
       options = 0;
-      Blynk.virtualWrite(V22, 0);   // backward compatible
+      Blynk.virtualWrite(V22, 0);   // backward compatible 
       break;
     case 2: // Item 2
       Serial.println("Item 2 selected (temperature)");
@@ -1655,7 +1570,7 @@ BLYNK_WRITE(V22)
 
 BLYNK_WRITE(V69)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V69 to a variable
+  int pinValue = param.asInt(); // assigning incoming value from pin V23 to a variable
 
   if (pinValue == 1) {
     delay(500);
@@ -1732,24 +1647,24 @@ BLYNK_READ(V6)
 BLYNK_CONNECTED()
 {
   bool relay1_status, relay2_status;
-
+  
   Serial.println("Blynk Sync.");
   // Blynk.syncAll();
 
   relay1_status = (0!=(*portOutputRegister( digitalPinToPort(RELAY1) ) & digitalPinToBitMask(RELAY1)));
-  Blynk.virtualWrite(V0, relay1_status);
+  Blynk.virtualWrite(V1, relay1_status);
   Serial.print("Relay #1 status = "); Serial.println(relay1_status);
-
+  
   #ifdef SECONDRELAY
   relay2_status = (0!=(*portOutputRegister( digitalPinToPort(RELAY2) ) & digitalPinToBitMask(RELAY2)));
   Blynk.virtualWrite(V3, relay2_status);
   Serial.print("Relay #2 status = "); Serial.println(relay2_status);
   #endif
 
-
-
+  
+  
   if (relay1_status == 1) {
-    led1.on();
+    led1.on();  
   }
   else {
     led1.off();
@@ -1760,15 +1675,14 @@ BLYNK_CONNECTED()
   else {
     led3.off();
   }
-  Serial.print("AUTO mode: ");  Serial.println(AUTO);
-  if (AUTO == true) {
+  if (AUTO) {
     Blynk.virtualWrite(V2, 1);
     led2.on();
   }
   else {
     Blynk.virtualWrite(V2, 0);
     led2.off();
-    Blynk.syncVirtual(V0);
+    Blynk.syncVirtual(V1);
     Blynk.syncVirtual(V3);
   }
   Blynk.syncVirtual(V19);
