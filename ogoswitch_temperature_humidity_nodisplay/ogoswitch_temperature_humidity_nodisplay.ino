@@ -41,8 +41,8 @@ SOFTWARE.
 // #define SOILMOISTURE
 // #define EXTERNALSENSE
 
-#define BLYNKLOCAL
-// #define THINGSPEAK
+// #define BLYNKLOCAL
+#define THINGSPEAK
 // #define
 // #define SECONDRELAY
 
@@ -54,7 +54,6 @@ SOFTWARE.
 #include "ogoswitch.h"
 #include <SPI.h>
 #include <SD.h>
-
 #include <ThingSpeak.h>
 #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
 #include <BlynkSimpleEsp8266.h>
@@ -98,14 +97,14 @@ const char* firmwareUrlBase = "http://www.ogonan.com/ogoupdate/";
 
 
 // ThingSpeak information
-char thingSpeakAddress[] = "api.thingspeak.com";
+// char thingSpeakAddress[] = "api.thingspeak.com";
 unsigned long channelID = 360709;
-char *readAPIKey = "GNZ8WEU763Z5DUEA";
-char *writeAPIKey = "8M07EYX8NPCD9V8U";
+char readAPIKey[17] = "GNZ8WEU763Z5DUEA";
+char writeAPIKey[17] = "8M07EYX8NPCD9V8U";
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
-char auth[] = "XXXXXXXXXXed4061bb4e0dXXXXXXXXXX";
+char auth[33] = "XXXXXXXXXXed4061bb4e0dXXXXXXXXXX";
 bool blynkConnectedResult = false;
 int blynkreconnect = 0;
 
@@ -155,10 +154,10 @@ float maxhumidity = HUMIDITY_SETPOINT;
 float minhumidity = HUMIDITY_SETPOINT - HUMIDITY_RANGE;
 
 float temperature_setpoint = TEMPERATURE_SETPOINT;  // 30.0 set point
-float temperature_range = TEMPERATURE_RANGE;      // +- 4.0 from set point
+float temperature_range = TEMPERATURE_RANGE;      // +- 2.0 from set point
 
 float humidity_setpoint = HUMIDITY_SETPOINT;     // 60 set point RH %
-float humidity_range = HUMIDITY_RANGE;          // +- 20 from set point
+float humidity_range = HUMIDITY_RANGE;          // +- 5 from set point
 
 // set for wifimanager to get value from user
 char t_setpoint[6] = "30";
@@ -217,12 +216,10 @@ int afterStop2 = -1;
 
 
 void setup()
-{
-  //WiFiManager
-  //Local intialization. Once its business is done, there is no need to keep it around
-  // WiFiManager wifiManager;
-  // String APName;
+{  
+  int saved;
 
+  EEPROM.begin(512);
   Serial.begin(115200);
   Serial.println();
   Serial.println("starting");
@@ -278,7 +275,8 @@ void setup()
 
 
   // read config from eeprom
-  EEPROM.begin(512);
+  
+  /*
   humidity_setpoint = (float) eeGetInt(0);
   humidity_range = (float) eeGetInt(4);
   temperature_setpoint = (float) eeGetInt(8);
@@ -286,12 +284,54 @@ void setup()
   options = eeGetInt(16);
   COOL = eeGetInt(20);
   MOISTURE = eeGetInt(24);
-  readEEPROM(writeAPIKey, 28, 16);
-  readEEPROM(readAPIKey, 44, 16);
-  readEEPROM(auth, 60, 32);
-  channelID = (unsigned long) EEPROMReadlong(92);
+  readEEPROM(writeAPIKey, 28, 17);
+  readEEPROM(readAPIKey, 45, 17);
+  readEEPROM(auth, 62, 33);
+  channelID = (unsigned long) EEPROMReadlong(95);
+  */
+  
+  
+  
+  EEPROM.get(0, humidity_setpoint);
+  EEPROM.get(4, humidity_range);
+  EEPROM.get(8, temperature_setpoint);
+  EEPROM.get(12,temperature_range); 
+  EEPROM.get(16, options);
+  EEPROM.get(20, COOL);
+  EEPROM.get(24, MOISTURE);
+  EEPROM.get(28, writeAPIKey); // 28 + 17 
+  EEPROM.get(45, readAPIKey);
+  EEPROM.get(62, auth);
+  EEPROM.get(95, channelID);
+  EEPROM.get(500, saved);
+  
 
-  int saved = eeGetInt(500);
+  Serial.println();
+  Serial.println("Configuration Read");
+  Serial.print("Temperature : ");
+  Serial.println(temperature_setpoint);
+  Serial.print("Temperature Range : ");
+  Serial.println(temperature_range);
+  Serial.print("Humidity : ");
+  Serial.println(humidity_setpoint);
+  Serial.print("Humidity Range : ");
+  Serial.println(humidity_range);
+  Serial.print("Option : ");
+  Serial.println(options);
+  Serial.print("COOL : ");
+  Serial.println(COOL);
+  Serial.print("MOISTURE : ");
+  Serial.println(MOISTURE);
+  Serial.print("Write API Key : ");
+  Serial.println(writeAPIKey);
+  Serial.print("Read API Key : ");
+  Serial.println(readAPIKey);
+  Serial.print("Channel ID : ");
+  Serial.println(channelID);
+  Serial.print("auth token : ");
+  Serial.println(auth);
+
+  // int saved = eeGetInt(500);
   if (saved == 6550) {
     dtostrf(humidity_setpoint, 2, 0, h_setpoint);
     dtostrf(humidity_range, 2, 0, h_range);
@@ -439,6 +479,7 @@ void autoWifiConnect()
 {
   WiFiManager wifiManager;
   String APName;
+  int saved = 6550;
 
   wifiManager.setBreakAfterConfig(true);
 
@@ -558,7 +599,7 @@ void autoWifiConnect()
   Serial.println(auth);
 
 
-  if (shouldSaveConfig) {
+  if (shouldSaveConfig) { //shouldSaveConfig
     Serial.println("Saving config...");
     strcpy(t_setpoint, custom_t_setpoint.getValue());
     strcpy(t_range, custom_t_range.getValue());
@@ -585,15 +626,15 @@ void autoWifiConnect()
     channelID = (unsigned long) atol(c_channelid);
 
     Serial.print("Temperature : ");
-    Serial.println(t_setpoint);
+    Serial.println(temperature_setpoint);
     Serial.print("Temperature Range : ");
-    Serial.println(t_range);
+    Serial.println(temperature_range);
     Serial.print("Humidity : ");
-    Serial.println(h_setpoint);
+    Serial.println(humidity_setpoint);
     Serial.print("Humidity Range : ");
-    Serial.println(h_range);
+    Serial.println(humidity_range);
     Serial.print("Option : ");
-    Serial.println(c_options);
+    Serial.println(options);
     Serial.print("COOL : ");
     Serial.println(COOL);
     Serial.print("MOISTURE : ");
@@ -607,18 +648,35 @@ void autoWifiConnect()
     Serial.print("auth token : ");
     Serial.println(auth);
 
-    eeWriteInt(0, atoi(h_setpoint));
-    eeWriteInt(4, atoi(h_range));
-    eeWriteInt(8, atoi(t_setpoint));
-    eeWriteInt(12, atoi(t_range));
+    
+    eeWriteInt(0, humidity_setpoint);
+    eeWriteInt(4, humidity_range);
+    eeWriteInt(8, temperature_setpoint);
+    eeWriteInt(12, temperature_range);
     eeWriteInt(16, options);
     eeWriteInt(20, COOL);
     eeWriteInt(24, MOISTURE);
-    writeEEPROM(writeAPIKey, 28, 16);
-    writeEEPROM(readAPIKey, 44, 16);
-    writeEEPROM(auth, 60, 32);
-    EEPROMWritelong(92, (long) channelID);
-    eeWriteInt(500, 6550);
+    writeEEPROM(writeAPIKey, 28, 17);
+    writeEEPROM(readAPIKey, 45, 17);
+    writeEEPROM(auth, 62, 33);
+    EEPROMWritelong(95, (long) channelID);
+    eeWriteInt(500, saved);
+    
+    /*
+    EEPROM.put(0, humidity_setpoint);
+    EEPROM.put(4, humidity_range);
+    EEPROM.put(8, temperature_setpoint);
+    EEPROM.put(12, temperature_range);
+    EEPROM.put(16, options);
+    EEPROM.put(20, COOL);
+    EEPROM.put(24, MOISTURE);
+    EEPROM.put(28, writeAPIKey);
+    EEPROM.put(45, readAPIKey);
+    EEPROM.put(62, auth);
+    EEPROM.put(95, channelID);
+    EEPROM.put(500, saved);
+    EEPROM.commit();
+    */
     shouldSaveConfig = false;
   }
 }
@@ -1170,9 +1228,11 @@ void delayStart2()
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
-  Serial.println("Should save config");
+  Serial.print("Should save config: ");
   shouldSaveConfig = true;
+  Serial.println(shouldSaveConfig);
 }
+
 
 void eeWriteInt(int pos, int val) {
     byte* p = (byte*) &val;
@@ -1255,6 +1315,7 @@ void writeEEPROM(char* buff, int offset, int len) {
     }
     EEPROM.commit();
 }
+
 
 
 int init_sdcard()
