@@ -43,7 +43,7 @@ SOFTWARE.
 
 // #define BLYNKLOCAL
 #define BLYNK
-// #define THINGSPEAK
+#define THINGSPEAK
 // #define
 // #define SECONDRELAY
 
