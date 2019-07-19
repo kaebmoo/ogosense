@@ -336,7 +336,7 @@ void checkBattery()
   
   // adc0 = ads1015.readADC_SingleEnded(0);
   adc0 = analogRead(BATT);
-  batteryVoltage = ((float) adc0 * 3) / 1000;
+  batteryVoltage = ((float) adc0 * 4.2) / 1023;
   Serial.print("Analog read A0: ");
   Serial.println(adc0);
 
