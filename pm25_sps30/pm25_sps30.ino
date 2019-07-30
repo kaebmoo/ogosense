@@ -170,8 +170,9 @@
 /////////// NO CHANGES BEYOND THIS POINT NEEDED ///////////////
 ///////////////////////////////////////////////////////////////
 
-#include <WiFi.h>
+// #include <WiFi.h>
 #include <WiFiClient.h>
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 #include <BlynkSimpleEsp32.h>
 
 
@@ -213,7 +214,11 @@ BlynkTimer timer;
 
 void setup() {
 
+  // WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wm;
+  
   Serial.begin(115200);
+  
 
   // serialTrigger("SPS30-Example1: Basic reading. press <enter> to start");
 
@@ -257,6 +262,8 @@ void setup() {
     if (sps30.I2C_expect() == 4)
       Serial.println(F(" !!! Due to I2C buffersize only the SPS30 MASS concentration is available !!! \n"));
   }
+
+  /*
   WiFi.begin(ssid, pass);
   Serial.print("WiFi Connecting");
   Serial.println();
@@ -264,17 +271,28 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-    /*
-    if ( digitalRead(TRIGGER_PIN) == LOW ) {
-      ondemandWiFi();
-    }
-    */
+    
+    // if ( digitalRead(TRIGGER_PIN) == LOW ) {
+    //   ondemandWiFi();
+    // }
+    
+  }
+  */
+  Serial.print("WiFi Connecting");
+  Serial.println();
+  if (!wm.autoConnect("ogoPM25_sps30", "")) {
+    Serial.println("failed to connect and hit timeout");
+    delay(3000);
+    // if we still have not connected restart and try all over again
+    ESP.restart();
+    delay(5000);
   }
   Serial.println();
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
-  
-  Blynk.begin(auth, ssid, pass, "blynk.ogonan.com");
+
+  Blynk.config(auth, "blynk.ogonan.com", 80);
+  Blynk.connect(3333);
   // You can also specify server:
   //Blynk.begin(auth, ssid, pass, "blynk-cloud.com", 80);
   //Blynk.begin(auth, ssid, pass, IPAddress(192,168,1,100), 8080);
