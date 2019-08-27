@@ -55,7 +55,7 @@ float MaxPowerDemand = 0.0;
 // int BUILTIN_LED = 2;  // ESP32 board
 
 
-char thingsboardServer[40] = "box.greenwing.email";
+char thingsboardServer[40] = "thingsboard.ogonan.com";
 int  mqttport = 1883;                      // 1883 or 1888
 char token[32] = "bLdQmUD1GvlIsCzirDld";   // device token from thingsboard server
 
@@ -99,7 +99,7 @@ void setup() {
   
   task1Time = blynkTimer.setInterval(15000L, readMeterData);
   task2Time = blynkTimer.setInterval(60000L, sendThingsBoard);
-  task3Time = blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
+  // task3Time = blynkTimer.setInterval(60000L, sendThingSpeak);                   // send data to thingspeak
 
   // Set the timer to overlap 5000ms
   blynkTimer.setTimeout(5000, onceOnlyTask1);
