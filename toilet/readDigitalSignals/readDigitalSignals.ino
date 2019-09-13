@@ -34,6 +34,8 @@ const char* server = "mqtt.ogonan.com";
 char mqttUserName[] = "kaebmoo";  // Can be any name.
 char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Account > MyProfile.
 String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
+String publishTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
+
 WiFiClient client; 
 PubSubClient mqttClient(client); 
 static const char alphanum[] ="0123456789"
