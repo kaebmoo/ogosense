@@ -24,8 +24,8 @@ unsigned long channelID = 793986;
 const char* server = "mqtt.ogonan.com"; 
 char mqttUserName[] = "kaebmoo";  // Can be any name.
 char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Account > MyProfile.
-String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
-String publishTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
+String subscribeTopic = "/channels/" + String( channelID ) + "/subscribe/fields/field3";
+String publishTopic = "/channels/" + String( channelID ) + "/subscribe/fields/field3";
 
 WiFiClient client; 
 PubSubClient mqttClient(client); 
@@ -43,6 +43,9 @@ void setup() {
   mqttConnect();
 }
 
+String payloadString = "";
+String compareString = "";
+
 void loop() {
   // put your main code here, to run repeatedly:
   // Look for new cards
@@ -59,6 +62,21 @@ void loop() {
   Serial.print(F("Card UID:"));
   dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
   Serial.println();
+  payloadString = String( (char *) mfrc522.uid.uidByte);
+  Serial.println(payloadString);
+  if (payloadString != compareString) {
+    compareString = payloadString;
+    String payload = "{";
+    payload += "\"id\":"; payload += "\""; payload += payloadString; payload += "\"";
+    payload += "}";
+    // char attributes[100];
+    // payload.toCharArray( attributes, 100 );
+    mqttClient.publish(publishTopic.c_str(), payload.c_str());
+    Serial.println(payload);
+    Serial.println();
+    
+  }
+
 }
 
 
@@ -94,6 +112,7 @@ void wifiConnect()
         ondemandWiFi();
       }
   }
+  Serial.println("Connected");
   
 }
 
