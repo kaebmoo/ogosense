@@ -54,9 +54,10 @@ SOFTWARE.
 Hardware: Wemos D1, Battery shield, Relay shield, Switching Power Supply 220VAC-12VDC, LiPo Battery 3.7V, Voltage Sensor Module 0-24VDC
 */
 
-#define THINGSBOARD
+// #define THINGSBOARD
+#define MQTT
 #define THINGSPEAK
-#define ENVIRONMENT
+// #define ENVIRONMENT
 
 #include <ESP8266WiFi.h> //https://github.com/esp8266/Arduino
 //needed for library
@@ -92,8 +93,8 @@ bool shouldSaveConfig = false;
 #define TOKEN "7yV3UaIeYZS62GbBCg6v"  // device token 
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
-char mqtt_server[] = "";
-char *myRoom = "sensor/power/1";
+char mqtt_server[] = "mqtt.ogonan.com";
+char *clientID = "sensor/power/2";
 
 
 // constants won't change. Used here to set a pin number:
@@ -118,14 +119,18 @@ float batteryVoltage = 0.0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-const char* server = "mqtt.thingspeak.com"; 
-unsigned long channelID = 793986;
-char* readAPIKey = "MYB70MLRK0HV274L";
-char* writeAPIKey = "VGLY9POK9GGK4WID";
+unsigned long channelID = 867076;
+char* readAPIKey = "YBDBDH7FOD0NTLID";
+char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
-char mqttUserName[] = "chang";  // Can be any name.
-char mqttPass[] = "";  // Change this your MQTT API Key from Account > MyProfile.
-String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
+// const char* server = "mqtt.ogonan.com"; 
+char mqttUserName[] = "kaebmoo";  // Can be any name.
+char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Account > MyProfile.
+// String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
+// String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field5";
+String subscribeTopic = "/channels/" + String( channelID ) + "/subscribe/messages";
+String publishTopic = "/channels/" + String( channelID ) + "/publish/messages";
+
 
 const unsigned long postingInterval = 300L * 1000L;
 long lastUpdateTime = 0; 
@@ -182,16 +187,16 @@ void loop() {
   timerCheckBattery.update();
   timerSwitch.update();
 
-  /*
-   * 
+  #ifdef MQTT
   // Reconnect if MQTT client is not connected.
   if (!mqttClient.connected()) 
   {
     reconnect();
   }
   mqttClient.loop();   // Call the loop continuously to establish connection to the server.
-
-  */
+  
+  #endif
+ 
 }
 
 void checkPowerLine()
@@ -306,12 +311,12 @@ void setupWifi()
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
   ThingSpeak.begin( client );
-  mqttConnect();
+  // mqttConnect();
 }
 
 void mqttConnect()
 {
-  mqttClient.setServer(server, 1883);   // Set the MQTT broker details.
+  mqttClient.setServer(mqtt_server, 1883);   // Set the MQTT broker details.
   mqttClient.setCallback(callback);  
 }
 
@@ -326,6 +331,8 @@ int write2ThingSpeak()
   
   ThingSpeak.setField( 1, powerLine );
   ThingSpeak.setField( 2, batteryVoltage );
+  
+  #ifdef ENVIRONMENT
   if (sht30.get() == 0) {
     temperature = sht30.cTemp;
     humidity = sht30.humidity;
@@ -339,6 +346,8 @@ int write2ThingSpeak()
   else {
     Serial.println("Temperature Sensor Error!");
   }
+  #endif
+  
   int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
   Serial.print("Send to Thingspeak status: ");
   Serial.println(writeSuccess);
@@ -461,6 +470,15 @@ void callback(char* topic, byte* payload, unsigned int length)
   else if (!strncmp(p, "off", 3) || !strncmp(p, "0", 1) ) {
     digitalWrite(RELAY1, RELAYOFF);
   }
+
+  String data = String(digitalRead(RELAY1), DEC);
+  const char *msgBuffer;
+  msgBuffer = data.c_str();
+  Serial.println(msgBuffer);
+  
+  const char *topicBuffer;
+  topicBuffer = publishTopic.c_str();
+  mqttClient.publish( topicBuffer, msgBuffer );
 }
 
 void turnOn()
@@ -476,16 +494,21 @@ void setupMqtt() {
   mqttClient.setServer(mqtt_server, MQTTPORT);
   #endif
   mqttClient.setCallback(callback);
-  if (mqttClient.connect(myRoom, TOKEN, NULL)) {
+  if (mqttClient.connect(clientID, TOKEN, NULL)) {
     // mqttClient.publish(roomStatus,"hello world");
 
     // mqttClient.subscribe(setmaxtemp);
     // mqttClient.subscribe(setmintemp);
     // mqttClient.subscribe(setmaxhumidity);
     // mqttClient.subscribe(setminhumidity);
+    mqttClient.subscribe( subscribeTopic.c_str() );
 
     Serial.print("mqtt connected : ");
+    #ifdef THINGSBOARD
     Serial.println(thingsboardServer);  // mqtt_server
+    #else
+    Serial.println(mqtt_server);  // mqtt_server
+    #endif
   }
 }
 
