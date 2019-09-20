@@ -164,6 +164,7 @@ void setup()
 
   // ads1015.begin();
   setupWifi();
+  ThingSpeak.begin( client );
   setupMqtt();
   checkPowerLine();
   checkBattery();
@@ -238,6 +239,7 @@ void checkPowerLine()
       writeSuccess = write2ThingSpeak();
       
       if (writeSuccess != 200) {                
+        // Thingspeak
         idTimer = timer.after(15000, write2ThingSpeakAgain);
       }
       #endif
@@ -310,15 +312,10 @@ void setupWifi()
 
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
-  ThingSpeak.begin( client );
-  // mqttConnect();
+  
+  
 }
 
-void mqttConnect()
-{
-  mqttClient.setServer(mqtt_server, 1883);   // Set the MQTT broker details.
-  mqttClient.setCallback(callback);  
-}
 
 int write2ThingSpeak()
 {
@@ -494,6 +491,7 @@ void setupMqtt() {
   mqttClient.setServer(mqtt_server, MQTTPORT);
   #endif
   mqttClient.setCallback(callback);
+  
   if (mqttClient.connect(clientID, TOKEN, NULL)) {
     // mqttClient.publish(roomStatus,"hello world");
 
