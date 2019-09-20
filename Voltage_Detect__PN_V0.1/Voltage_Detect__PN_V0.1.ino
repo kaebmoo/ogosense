@@ -451,6 +451,10 @@ void reconnect()
 
 void callback(char* topic, byte* payload, unsigned int length) 
 {
+  // mosquitto_pub -h mqtt.ogonan.com -t "/channels/867076/subscribe/messages" -u "user" -P "pass"  -m "off"
+  // mosquitto_sub -h mqtt.ogonan.com -t "/channels/867076/publish/messages" -u "user" -P "pass"
+  // mosquitto_sub -h mqtt.ogonan.com -t "/channels/867076/subscribe/messages" -u "user" -P "pass"
+  
   int i;
   char p[length + 1];
   memcpy(p, payload, length);
