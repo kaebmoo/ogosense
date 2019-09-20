@@ -94,7 +94,7 @@ bool shouldSaveConfig = false;
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
 char mqtt_server[] = "mqtt.ogonan.com";
-char *clientID = "sensor/power/2";
+char *clientID = "sensor/power/867076";
 
 
 // constants won't change. Used here to set a pin number:
@@ -419,11 +419,15 @@ void reconnect()
   // Loop until reconnected.
   while (!mqttClient.connected()) {
     Serial.print("Attempting MQTT connection...");
+
+    /*
     // Generate ClientID
     for (int i = 0; i < 8; i++) {
         clientID[i] = alphanum[random(51)];
     }
     clientID[8]='\0';
+    */
+    
     // Connect to the MQTT broker
     if (mqttClient.connect(clientID,mqttUserName,mqttPass)) {
       Serial.print("Connected with Client ID:  ");
