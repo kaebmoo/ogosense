@@ -48,6 +48,11 @@ String compareString = "";
 
 void loop() {
   // put your main code here, to run repeatedly:
+  if (!mqttClient.connected()) {
+    reconnect();
+  }
+  mqttClient.loop();
+  
   // Look for new cards
   if ( ! mfrc522.PICC_IsNewCardPresent()) {
     delay(50);
@@ -71,8 +76,10 @@ void loop() {
     payload += "}";
     // char attributes[100];
     // payload.toCharArray( attributes, 100 );
-    mqttClient.publish(publishTopic.c_str(), payload.c_str());
-    Serial.println(payload);
+    mqttClient.publish(publishTopic.c_str(), payloadString.c_str());
+    Serial.print(publishTopic);
+    Serial.print(" ");
+    Serial.println(payloadString);
     Serial.println();
     
   }
