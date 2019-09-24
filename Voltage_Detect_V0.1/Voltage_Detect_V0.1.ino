@@ -54,6 +54,8 @@ SOFTWARE.
 Hardware: Wemos D1, Battery shield, Relay shield, Switching Power Supply 220VAC-12VDC, LiPo Battery 3.7V, Voltage Sensor Module 0-24VDC
 */
 
+// #define MQTT
+
 #include <ESP8266WiFi.h> //https://github.com/esp8266/Arduino
 //needed for library
 #include <DNSServer.h>
@@ -73,6 +75,7 @@ const int BATT = A0;
 const int POWER = D7;
 //flag for saving data
 bool shouldSaveConfig = false;
+const int RELAYACTIVE = LOW;
 
 
 // constants won't change. Used here to set a pin number:
@@ -97,14 +100,17 @@ float batteryVoltage = 0.0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-const char* server = "mqtt.thingspeak.com"; 
-unsigned long channelID = 793986;
-char* readAPIKey = "MYB70MLRK0HV274L";
-char* writeAPIKey = "VGLY9POK9GGK4WID";
+// const char* server = "mqtt.thingspeak.com"; 
+const char* server = "mqtt.ogonan.com"; 
+unsigned long channelID = 867076;
+char* readAPIKey = "YBDBDH7FOD0NTLID";
+char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
-char mqttUserName[] = "chang";  // Can be any name.
-char mqttPass[] = "";  // Change this your MQTT API Key from Account > MyProfile.
-String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
+char mqttUserName[] = "kaebmoo";  // Can be any name.
+char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Account > MyProfile.
+// String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field5";
+String subscribeTopic = "/channels/" + String( channelID ) + "/subscribe/messages";
+String publishTopic = "channels/" + String( channelID ) + "/publish/messages";
 
 const unsigned long postingInterval = 300L * 1000L;
 long lastUpdateTime = 0; 
@@ -133,6 +139,10 @@ void setup() {
 
   // ads1015.begin();
   setupWifi();
+  ThingSpeak.begin( client );
+  #ifdef MQTT
+  mqttConnect();
+  #endif
   checkPowerLine();
   checkBattery();
   write2ThingSpeak();
@@ -153,8 +163,7 @@ void loop() {
   timerCheckBattery.update();
   timerSwitch.update();
 
-  /*
-   * 
+  #ifdef MQTT
   // Reconnect if MQTT client is not connected.
   if (!mqttClient.connected()) 
   {
@@ -162,7 +171,7 @@ void loop() {
   }
   mqttClient.loop();   // Call the loop continuously to establish connection to the server.
 
-  */
+  #endif
 }
 
 void checkPowerLine()
@@ -262,8 +271,7 @@ void setupWifi()
 
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
-  ThingSpeak.begin( client );
-  mqttConnect();
+  
 }
 
 void mqttConnect()
@@ -393,12 +401,21 @@ void callback(char* topic, byte* payload, unsigned int length)
   Serial.println();
 
   if (!strncmp(p, "on", 2) || !strncmp(p, "1", 1)) {
-    digitalWrite(RELAY1, HIGH);
+    digitalWrite(RELAY1, RELAYACTIVE);
     idTimerSwitch = timerSwitch.after(10000, turnOn);
   }
   else if (!strncmp(p, "off", 3) || !strncmp(p, "0", 1) ) {
-    digitalWrite(RELAY1, LOW);
+    digitalWrite(RELAY1, !RELAYACTIVE);
   }
+
+  String data = String(digitalRead(RELAY1), DEC);
+  const char *msgBuffer;
+  msgBuffer = data.c_str();
+  Serial.println(msgBuffer);
+  
+  const char *topicBuffer;
+  topicBuffer = publishTopic.c_str();
+  mqttClient.publish( topicBuffer, msgBuffer );
 }
 
 void turnOn()
