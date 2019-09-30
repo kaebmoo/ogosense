@@ -55,7 +55,7 @@ Hardware: Wemos D1, Battery shield, Relay shield, Switching Power Supply 220VAC-
 */
 
 // #define THINGSBOARD
-#define MQTT
+// #define MQTT
 #define THINGSPEAK
 // #define ENVIRONMENT
 
@@ -119,7 +119,7 @@ float batteryVoltage = 0.0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 1;
+unsigned long channelID = 867076;
 char* readAPIKey = "YBDBDH7FOD0NTLID";
 char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
@@ -165,7 +165,9 @@ void setup()
   // ads1015.begin();
   setupWifi();
   ThingSpeak.begin( client );
+  #if defined(MQTT) || defined(THINGSBOARD)
   setupMqtt();
+  #endif 
   checkPowerLine();
   checkBattery();
   #ifdef THINGSPEAK
@@ -188,7 +190,7 @@ void loop() {
   timerCheckBattery.update();
   timerSwitch.update();
 
-  #ifdef MQTT
+  #if defined(MQTT) || defined(THINGSBOARD)
   // Reconnect if MQTT client is not connected.
   if (!mqttClient.connected()) 
   {
@@ -412,38 +414,30 @@ void checkBattery()
   Serial.println(batteryVoltage);
 }
 
-void setupMqtt() {
+void setupMqtt() 
+{
+
   #ifdef THINGSBOARD
   mqttClient.setServer(thingsboardServer, MQTTPORT);  // default port 1883, mqtt_server, thingsboardServer
-  #else
-  Serial.print(mqtt_server);
-  Serial.print(" ");
-  Serial.println(MQTTPORT);
-  mqttClient.setServer(mqtt_server, MQTTPORT);
-  #endif
   mqttClient.setCallback(callback);
-
-  #ifdef THINGSBOARD
   if (mqttClient.connect(clientID, TOKEN, NULL)) {
-  #else
-  if (mqttClient.connect(clientID,mqttUserName,mqttPass)) {
-  #endif  
-  
-    // mqttClient.publish(roomStatus,"hello world");
-
-    // mqttClient.subscribe(setmaxtemp);
-    // mqttClient.subscribe(setmintemp);
-    // mqttClient.subscribe(setmaxhumidity);
-    // mqttClient.subscribe(setminhumidity);
     mqttClient.subscribe( subscribeTopic.c_str() );
-
-    Serial.print("mqtt connected : ");
-    #ifdef THINGSBOARD
+    Serial.print("mqtt connected : ");    
     Serial.println(thingsboardServer);  // mqtt_server
-    #else
-    Serial.println(mqtt_server);  // mqtt_server
-    #endif
+    
   }
+  #endif
+  
+  #ifdef MQTT
+  Serial.print(mqtt_server); Serial.print(" "); Serial.println(MQTTPORT);
+  mqttClient.setCallback(callback);
+  mqttClient.setServer(mqtt_server, MQTTPORT);
+  if (mqttClient.connect(clientID,mqttUserName,mqttPass)) {
+    mqttClient.subscribe( subscribeTopic.c_str() );
+    Serial.print("mqtt connected : ");
+        Serial.println(mqtt_server);  // mqtt_server
+  }
+  #endif
 }
 
 void reconnect() 
@@ -452,6 +446,7 @@ void reconnect()
 
   // Loop until reconnected.
   // while (!mqttClient.connected()) {
+  // }
     Serial.print("Attempting MQTT connection...");
 
     /*
@@ -470,7 +465,20 @@ void reconnect()
       Serial.print(String(clientID));  
       Serial.print(", Token: ");
       Serial.print(TOKEN);
-    #else
+      mqttClient.subscribe( subscribeTopic.c_str() );
+    }
+    else {
+      Serial.print("failed, rc=");
+      // Print to know why the connection failed.
+      // See https://pubsubclient.knolleary.net/api.html#state for the failure code explanation.
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 2 seconds");
+      Alarm.delay(2000);
+    }
+    
+    #endif
+    
+    #ifdef MQTT
     mqttClient.setServer(mqtt_server, MQTTPORT);
     if (mqttClient.connect(clientID,mqttUserName,mqttPass)) {
       Serial.print("Connected with Client ID:  ");
@@ -479,21 +487,18 @@ void reconnect()
       Serial.print(mqttUserName);
       Serial.print(" , Passwword: ");
       Serial.println(mqttPass);  
-    
-    #endif  
-    
-      
       mqttClient.subscribe( subscribeTopic.c_str() );
-    } 
+    }
     else {
       Serial.print("failed, rc=");
       // Print to know why the connection failed.
       // See https://pubsubclient.knolleary.net/api.html#state for the failure code explanation.
       Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
-      delay(5000);
+      Serial.println(" try again in 2 seconds");
+      Alarm.delay(2000);
     }
-  // } // Loop
+    #endif  
+   
 }
 
 void callback(char* topic, byte* payload, unsigned int length) 
