@@ -52,6 +52,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 Hardware: Wemos D1, Battery shield, Relay shield, Switching Power Supply 220VAC-12VDC, LiPo Battery 3.7V, Voltage Sensor Module 0-24VDC
+
+V0.1 init on PN Board
+V0.2 One thingspeak channel for all node
+
 */
 
 // #define THINGSBOARD
@@ -119,7 +123,7 @@ float batteryVoltage = 0.0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 867076;
+unsigned long channelID = 867077;
 char* readAPIKey = "YBDBDH7FOD0NTLID";
 char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
@@ -185,7 +189,7 @@ void loop() {
 
   checkPowerLine();
   
-  Alarm.delay(500);
+  Alarm.delay(200);
   timer.update();
   timerCheckBattery.update();
   timerSwitch.update();
@@ -330,6 +334,7 @@ int write2ThingSpeak()
   
   ThingSpeak.setField( 1, powerLine );
   ThingSpeak.setField( 2, batteryVoltage );
+  ThingSpeak.setField( 5, (long ) channelID );
   
   #ifdef ENVIRONMENT
   if (sht30.get() == 0) {
