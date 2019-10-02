@@ -58,7 +58,7 @@ V0.2 One thingspeak channel for all node
 
 */
 
-// #define THINGSBOARD
+#define THINGSBOARD
 // #define MQTT
 #define THINGSPEAK
 #define ENVIRONMENT
@@ -470,7 +470,9 @@ void reconnect()
       Serial.print(String(clientID));  
       Serial.print(", Token: ");
       Serial.print(TOKEN);
-      mqttClient.subscribe( subscribeTopic.c_str() );
+      
+      // Subscribing to receive RPC requests
+      mqttClient.subscribe("v1/devices/me/rpc/request/+");
     }
     else {
       Serial.print("failed, rc=");
@@ -511,7 +513,53 @@ void callback(char* topic, byte* payload, unsigned int length)
   // mosquitto_pub -h mqtt.ogonan.com -t "/channels/867076/subscribe/messages" -u "user" -P "pass"  -m "off"
   // mosquitto_sub -h mqtt.ogonan.com -t "/channels/867076/publish/messages" -u "user" -P "pass"
   // mosquitto_sub -h mqtt.ogonan.com -t "/channels/867076/subscribe/messages" -u "user" -P "pass"
+  #ifdef THINGSBOARD
+  Serial.println("On message");
   
+  char json[length + 1];
+  strncpy (json, (char*)payload, length);
+  json[length] = '\0';
+
+  Serial.print("Topic: ");
+  Serial.println(topic);
+  Serial.print("Message: ");
+  Serial.println(json);
+
+  // Decode JSON request
+  StaticJsonBuffer<200> jsonBuffer;
+  JsonObject& data = jsonBuffer.parseObject((char*)json);
+
+  if (!data.success())
+  {
+    Serial.println("parseObject() failed");
+    return;
+  }
+
+  // Check request method
+  String methodName = String((const char*)data["method"]);
+
+  if (methodName.equals("turnOff")) 
+  {
+    // Update GPIO status and reply
+    digitalWrite(RELAY1, RELAYOFF);
+    
+  }
+  else if (methodName.equals("turnOn")) 
+  {
+    // Update GPIO status and reply
+    digitalWrite(RELAY1, RELAYON);
+    
+  }
+  String relayStatus = String(digitalRead(RELAY1), DEC);
+  String responseTopic = String(topic);
+  
+  responseTopic.replace("request", "response");
+  mqttClient.publish(responseTopic.c_str(), relayStatus.c_str());
+  mqttClient.publish("v1/devices/me/telemetry", relayStatus.c_str());
+  
+  #endif
+
+  #ifdef MQTT
   int i;
   char p[length + 1];
   memcpy(p, payload, length);
@@ -527,27 +575,29 @@ void callback(char* topic, byte* payload, unsigned int length)
 
   if (!strncmp(p, "on", 2) || !strncmp(p, "1", 1)) {
     digitalWrite(RELAY1, RELAYON);
-    idTimerSwitch = timerSwitch.after(10000, turnOn);
+    // idTimerSwitch = timerSwitch.after(10000, turnOn);
   }
   else if (!strncmp(p, "off", 3) || !strncmp(p, "0", 1) ) {
     digitalWrite(RELAY1, RELAYOFF);
   }
 
-  String data = String(digitalRead(RELAY1), DEC);
+  String relayStatus = String(digitalRead(RELAY1), DEC);
   const char *msgBuffer;
-  msgBuffer = data.c_str();
+  msgBuffer = relayStatus.c_str();
   Serial.print("Status Logic: ");
   Serial.println(msgBuffer);
   
   const char *topicBuffer;
   topicBuffer = publishTopic.c_str();
   mqttClient.publish( topicBuffer, msgBuffer );
+  
+  #endif
 }
 
 void turnOn()
 {
   digitalWrite(RELAY1, RELAYON);
-  timerSwitch.stop(idTimerSwitch);
+  // timerSwitch.stop(idTimerSwitch);
 }
 
 void sendThingsBoard(uint16_t power)
