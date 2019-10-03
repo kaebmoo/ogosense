@@ -123,7 +123,7 @@ float batteryVoltage = 0.0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 867077;
+unsigned long channelID = 793986;
 char* readAPIKey = "YBDBDH7FOD0NTLID";
 char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
@@ -602,6 +602,10 @@ void turnOn()
 
 void sendThingsBoard(uint16_t power)
 {
+  // char buf[32];
+
+  // ltoa(channelID, buf, 10);
+  
   // Just debug messages
   Serial.print( "Sending power status : [" );
   Serial.print( power );
@@ -610,7 +614,7 @@ void sendThingsBoard(uint16_t power)
   // Prepare a JSON payload string
   String payload = "{";
   payload += "\"Power Line Detect\":"; payload += power; payload += ",";
-  payload += "\"active\":"; payload += true;
+  payload += "\"Node\":"; payload += channelID;
   payload += "}";
 
   // Send payload
