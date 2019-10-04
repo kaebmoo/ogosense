@@ -27,14 +27,14 @@ MUX74HC4067 mux(D1, D2, D5, D6, D7);
 
 #define LED D4
 
-unsigned long channelID = 793986;
+unsigned long channelID = 803;
 
 
 const char* server = "mqtt.ogonan.com"; 
 char mqttUserName[] = "kaebmoo";  // Can be any name.
 char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Account > MyProfile.
 String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
-String publishTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
+String publishTopic = "/rooms/" + String( channelID ) + "";
 
 WiFiClient client; 
 PubSubClient mqttClient(client); 
@@ -62,7 +62,7 @@ void setup()
   // led_set(0, 0, 0);
   setupWifi();
 
-  timer.after(60000, gotoSleep);
+  timer.after(120000, gotoSleep);
 }
 
 // Reads the 16 channels and reports on the serial monitor
@@ -93,13 +93,39 @@ void loop()
     }
     else if ( data == LOW ) {
       Serial.println("pressed");
-      led_set(0, 255, 0);//green
-      delay(200);
-      led_set(0, 0, 0);
-      delay(200);
-      led_set(0, 255, 0);//green
-      delay(200);
-      led_set(0, 0, 0);
+      if (i == 0) {
+        led_set(255, 255, 0);//green
+        delay(200);
+        led_set(0, 0, 0);
+        delay(200);
+        led_set(255, 255, 0);//green
+        delay(200);
+        led_set(0, 0, 0);
+      }
+      else {
+        led_set(0, 255, 0);//green
+        delay(200);
+        led_set(0, 0, 0);
+        delay(200);
+        led_set(0, 255, 0);//green
+        delay(200);
+        led_set(0, 0, 0);
+      }
+      String payload = "{";
+      payload += "\"Room\":"; payload += channelID; payload += ",";
+      payload += "\"id\":"; payload += i;
+      payload += "}";
+      const char *msgBuffer;
+      msgBuffer = payload.c_str();
+      
+      const char *topicBuffer;
+      topicBuffer = publishTopic.c_str();
+
+      Serial.print(topicBuffer); 
+      Serial.print(" ");
+      Serial.println(msgBuffer);
+      
+      mqttClient.publish(topicBuffer, msgBuffer);
     }
   }
   Serial.println();
