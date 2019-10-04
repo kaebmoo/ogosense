@@ -93,13 +93,24 @@ void loop()
     }
     else if ( data == LOW ) {
       Serial.println("pressed");
-      led_set(0, 255, 0);//green
-      delay(200);
-      led_set(0, 0, 0);
-      delay(200);
-      led_set(0, 255, 0);//green
-      delay(200);
-      led_set(0, 0, 0);
+      if (i == 0) {
+        led_set(255, 255, 0);//green
+        delay(200);
+        led_set(0, 0, 0);
+        delay(200);
+        led_set(255, 255, 0);//green
+        delay(200);
+        led_set(0, 0, 0);
+      }
+      else {
+        led_set(0, 255, 0);//green
+        delay(200);
+        led_set(0, 0, 0);
+        delay(200);
+        led_set(0, 255, 0);//green
+        delay(200);
+        led_set(0, 0, 0);
+      }
     }
   }
   Serial.println();
