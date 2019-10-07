@@ -14,25 +14,26 @@
 #include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
 #include <PubSubClient.h>
 #include <ArduinoJson.h> // https://arduinojson.org/v5/assistant/
+#include "Timer.h"
 
 #include "MFRC522.h"
 #define RST_PIN  D1 // RST-PIN for RC522 - RFID - SPI - Modul GPIO5 
 #define SS_PIN  D2 // SDA-PIN for RC522 - RFID - SPI - Modul GPIO4 
 MFRC522 mfrc522(SS_PIN, RST_PIN); // Create MFRC522 instance
 
-unsigned long channelID = 793986;
+unsigned long channelID = 801;
 const char* server = "mqtt.ogonan.com"; 
 char mqttUserName[] = "kaebmoo";  // Can be any name.
 char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Account > MyProfile.
-String subscribeTopic = "/channels/" + String( channelID ) + "/subscribe/fields/field3";
-String publishTopic = "/channels/" + String( channelID ) + "/subscribe/fields/field3";
+String subscribeTopic = "/rooms/" + String( channelID ) + "";
+String publishTopic = "/rooms/" + String( channelID ) + "";
 
 WiFiClient client; 
 PubSubClient mqttClient(client); 
 static const char alphanum[] ="0123456789"
                               "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                               "abcdefghijklmnopqrstuvwxyz";  // For random generation of client ID.
-
+Timer timer;
 
 void setup() {
   // put your setup code here, to run once:
@@ -41,6 +42,7 @@ void setup() {
   mfrc522.PCD_Init();    // Init MFRC522
   wifiConnect();
   mqttConnect();
+  timer.every(5000, resetCardId);
 }
 
 String payloadString = "";
@@ -48,6 +50,8 @@ String compareString = "";
 
 void loop() {
   // put your main code here, to run repeatedly:
+
+  timer.update();
   if (!mqttClient.connected()) {
     reconnect();
   }
@@ -55,11 +59,13 @@ void loop() {
   
   // Look for new cards
   if ( ! mfrc522.PICC_IsNewCardPresent()) {
+    // Serial.print("Is New Card Present");
     delay(50);
     return;
   }
   // Select one of the cards
   if ( ! mfrc522.PICC_ReadCardSerial()) {
+    // Serial.print("Read Card Serial");
     delay(50);
     return;
   }
@@ -71,22 +77,34 @@ void loop() {
   Serial.println(payloadString);
   if (payloadString != compareString) {
     compareString = payloadString;
+
+    unsigned long rfid;
+    rfid = mfrc522.uid.uidByte[0] << 24;
+    rfid += mfrc522.uid.uidByte[1] << 16;
+    rfid += mfrc522.uid.uidByte[2] << 8;
+    rfid += mfrc522.uid.uidByte[3];
+    
+    
     String payload = "{";
-    payload += "\"id\":"; payload += "\""; payload += payloadString; payload += "\"";
+    payload += "\"Room\":"; payload += channelID; payload += ",";
+    payload += "\"id\":"; payload += rfid;
     payload += "}";
     // char attributes[100];
     // payload.toCharArray( attributes, 100 );
-    mqttClient.publish(publishTopic.c_str(), payloadString.c_str());
+    mqttClient.publish(publishTopic.c_str(), payload.c_str());
     Serial.print(publishTopic);
     Serial.print(" ");
-    Serial.println(payloadString);
+    Serial.println(payload);
     Serial.println();
     
   }
 
 }
 
-
+void resetCardId()
+{
+  compareString = "";
+}
 
 
 // Helper routine to dump a byte array as hex values to Serial
@@ -107,7 +125,8 @@ void wifiConnect()
   Serial.println(WiFi.psk());
   String SSID = WiFi.SSID();
   String PSK = WiFi.psk();
-  WiFi.begin("Red2", "ogonan2019");
+  // WiFi.begin("Red2", "ogonan2019");
+  WiFi.begin();
   Serial.print("Connecting");
   Serial.println();
   while (WiFi.status() != WL_CONNECTED) {

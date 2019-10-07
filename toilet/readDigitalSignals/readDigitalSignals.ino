@@ -62,7 +62,7 @@ void setup()
   // led_set(0, 0, 0);
   setupWifi();
 
-  timer.after(120000, gotoSleep);
+  // timer.after(120000, gotoSleep);
 }
 
 // Reads the 16 channels and reports on the serial monitor
@@ -95,20 +95,20 @@ void loop()
       Serial.println("pressed");
       if (i == 0) {
         led_set(255, 255, 0);//green
-        delay(200);
+        delay(100);
         led_set(0, 0, 0);
-        delay(200);
+        delay(100);
         led_set(255, 255, 0);//green
-        delay(200);
+        delay(100);
         led_set(0, 0, 0);
       }
       else {
         led_set(0, 255, 0);//green
-        delay(200);
+        delay(100);
         led_set(0, 0, 0);
-        delay(200);
+        delay(100);
         led_set(0, 255, 0);//green
-        delay(200);
+        delay(100);
         led_set(0, 0, 0);
       }
       String payload = "{";
@@ -130,7 +130,7 @@ void loop()
   }
   Serial.println();
   
-  delay(300);
+  delay(200);
 }
 
 void led_set(uint8 R, uint8 G, uint8 B) {
