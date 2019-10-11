@@ -94,7 +94,7 @@ const int POWER = D7;
 //flag for saving data
 bool shouldSaveConfig = false;
 
-#define TOKEN "7yV3UaIeYZS62GbBCg6v"  // device token 
+#define TOKEN "pQlhFtmzDdU29njuSzvu"  // device token node 
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
 char mqtt_server[] = "mqtt.ogonan.com";
@@ -123,7 +123,7 @@ float batteryVoltage = 0.0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 793986;
+unsigned long channelID = 867076;
 char* readAPIKey = "YBDBDH7FOD0NTLID";
 char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
@@ -355,6 +355,10 @@ int write2ThingSpeak()
   int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
   Serial.print("Send to Thingspeak status: ");
   Serial.println(writeSuccess);
+
+  #ifdef THINGSBOARD
+    sendThingsBoard(powerLine);
+  #endif
   
   return writeSuccess;
 }
@@ -514,6 +518,8 @@ void callback(char* topic, byte* payload, unsigned int length)
   // mosquitto_sub -h mqtt.ogonan.com -t "/channels/867076/publish/messages" -u "user" -P "pass"
   // mosquitto_sub -h mqtt.ogonan.com -t "/channels/867076/subscribe/messages" -u "user" -P "pass"
   #ifdef THINGSBOARD
+  
+  
   Serial.println("On message");
   
   char json[length + 1];
@@ -535,8 +541,12 @@ void callback(char* topic, byte* payload, unsigned int length)
     return;
   }
 
+  String relayStatus;
+  String responseTopic;
+  
   // Check request method
   String methodName = String((const char*)data["method"]);
+  String valueName = String((const char *) data["params"]);
 
   if (methodName.equals("turnOff")) 
   {
@@ -544,18 +554,45 @@ void callback(char* topic, byte* payload, unsigned int length)
     digitalWrite(RELAY1, RELAYOFF);
     
   }
-  else if (methodName.equals("turnOn")) 
+  else if (methodName.equals("setRelay")) 
   {
     // Update GPIO status and reply
-    digitalWrite(RELAY1, RELAYON);
+    if (valueName.equals("1")) {
+      Serial.println("Turn On");
+      digitalWrite(RELAY1, RELAYON);
+    }
+    else if (valueName.equals("0")) {
+      Serial.println("Turn Off");
+      digitalWrite(RELAY1, RELAYOFF);
+    }
+    else {
+      Serial.println("Invalid value");
+    }
+    relayStatus = String(digitalRead(RELAY1) ? 0 : 1, DEC);
+    responseTopic = String(topic);
     
+    responseTopic.replace("request", "response");
+    mqttClient.publish(responseTopic.c_str(), relayStatus.c_str());
+    String message = "{\"Relay Status\":" + relayStatus + "}";
+    mqttClient.publish("v1/devices/me/telemetry",  message.c_str());
+    Serial.print("topic : ");
+    Serial.print("v1/devices/me/telemetry");
+    Serial.print(" : message ");
+    Serial.println(message);
   }
-  String relayStatus = String(digitalRead(RELAY1), DEC);
-  String responseTopic = String(topic);
-  
-  responseTopic.replace("request", "response");
-  mqttClient.publish(responseTopic.c_str(), relayStatus.c_str());
-  mqttClient.publish("v1/devices/me/telemetry", relayStatus.c_str());
+  else if (methodName.equals("getValue")) {
+    relayStatus = String(digitalRead(RELAY1) ? 0 : 1, DEC);
+    responseTopic = String(topic);
+    
+    responseTopic.replace("request", "response");
+    mqttClient.publish(responseTopic.c_str(), relayStatus.c_str());
+    String message = "{\"Relay Status\":" + relayStatus + "}";
+    mqttClient.publish("v1/devices/me/telemetry",  message.c_str());
+    Serial.print("topic : ");
+    Serial.print("v1/devices/me/telemetry");
+    Serial.print(" : message ");
+    Serial.println(message);
+  }
   
   #endif
 
