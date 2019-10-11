@@ -328,6 +328,11 @@ int write2ThingSpeak()
   float temperature;
   int humidity;
   
+  #ifdef THINGSBOARD
+    Serial.println("Sending data to ThingsBoard");
+    sendThingsBoard(powerLine);
+  #endif
+  
   Serial.println("Sending data to ThingSpeak");
   Serial.print("Power Line Status:");
   Serial.println(powerLine);
@@ -355,10 +360,6 @@ int write2ThingSpeak()
   int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
   Serial.print("Send to Thingspeak status: ");
   Serial.println(writeSuccess);
-
-  #ifdef THINGSBOARD
-    sendThingsBoard(powerLine);
-  #endif
   
   return writeSuccess;
 }
