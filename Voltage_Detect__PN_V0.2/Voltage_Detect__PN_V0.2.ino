@@ -94,11 +94,11 @@ const int POWER = D7;
 //flag for saving data
 bool shouldSaveConfig = false;
 
-#define TOKEN "pQlhFtmzDdU29njuSzvu"  // device token node 
+#define TOKEN "HMrHsdYzNC6TRShI3Nch"  // device token node 
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
 char mqtt_server[] = "mqtt.ogonan.com";
-char *clientID = "sensor/power/867076";
+char *clientID = "sensor/power/867123";
 
 
 // constants won't change. Used here to set a pin number:
@@ -120,10 +120,12 @@ int countOn = 0;
 int countOff = 0;
 int idTimer;
 float batteryVoltage = 0.0;
+float temperature = 0.0;
+int humidity = 0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 867076;
+unsigned long channelID = 867123;
 char* readAPIKey = "YBDBDH7FOD0NTLID";
 char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
@@ -325,17 +327,6 @@ void setupWifi()
 
 int write2ThingSpeak()
 {
-  float temperature;
-  int humidity;
-  
-  #ifdef THINGSBOARD
-    Serial.println("Sending data to ThingsBoard");
-    sendThingsBoard(powerLine);
-  #endif
-  
-  Serial.println("Sending data to ThingSpeak");
-  Serial.print("Power Line Status:");
-  Serial.println(powerLine);
   
   ThingSpeak.setField( 1, powerLine );
   ThingSpeak.setField( 2, batteryVoltage );
@@ -356,6 +347,15 @@ int write2ThingSpeak()
     Serial.println("Temperature Sensor Error!");
   }
   #endif
+  
+  #ifdef THINGSBOARD
+    Serial.println("Sending data to ThingsBoard");
+    sendThingsBoard(powerLine);
+  #endif
+  
+  Serial.println("Sending data to ThingSpeak");
+  Serial.print("Power Line Status:");
+  Serial.println(powerLine);
   
   int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
   Serial.print("Send to Thingspeak status: ");
@@ -431,7 +431,7 @@ void setupMqtt()
   mqttClient.setServer(thingsboardServer, MQTTPORT);  // default port 1883, mqtt_server, thingsboardServer
   mqttClient.setCallback(callback);
   if (mqttClient.connect(clientID, TOKEN, NULL)) {
-    mqttClient.subscribe( subscribeTopic.c_str() );
+    mqttClient.subscribe("v1/devices/me/rpc/request/+");
     Serial.print("mqtt connected : ");    
     Serial.println(thingsboardServer);  // mqtt_server
     
@@ -452,8 +452,7 @@ void setupMqtt()
 
 void reconnect() 
 {
-  char clientID[9];
-
+  
   // Loop until reconnected.
   // while (!mqttClient.connected()) {
   // }
@@ -461,6 +460,7 @@ void reconnect()
 
     /*
     // Generate ClientID
+    char clientID[9];
     for (int i = 0; i < 8; i++) {
         clientID[i] = alphanum[random(51)];
     }
@@ -652,12 +652,15 @@ void sendThingsBoard(uint16_t power)
   // Prepare a JSON payload string
   String payload = "{";
   payload += "\"Power Line Detect\":"; payload += power; payload += ",";
-  payload += "\"Node\":"; payload += channelID;
+  payload += "\"Node\":"; payload += channelID; payload += ",";
+  payload += "\"Battery\":"; payload += batteryVoltage; payload += ",";
+  payload += "\"Temperature\":"; payload += temperature; payload += ",";
+  payload += "\"Humidity\":"; payload += humidity;
   payload += "}";
 
   // Send payload
-  char attributes[100];
-  payload.toCharArray( attributes, 100 );
+  char attributes[128];
+  payload.toCharArray( attributes, 128 );
   mqttClient.publish( "v1/devices/me/telemetry", attributes );
   Serial.println( attributes );
   Serial.println();

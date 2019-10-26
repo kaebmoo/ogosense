@@ -37,7 +37,7 @@ Timer timer;
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200);    // Initialize serial communications
+  Serial.begin(9600);    // Initialize serial communications
   SPI.begin();           // Init SPI bus
   mfrc522.PCD_Init();    // Init MFRC522
   wifiConnect();
