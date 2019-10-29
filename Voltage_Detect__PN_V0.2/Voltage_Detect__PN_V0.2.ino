@@ -161,6 +161,7 @@ void setup()
   pinMode(BATT, INPUT);
   pinMode(RELAY1, OUTPUT);
   digitalWrite(RELAY1, HIGH);
+  randomSeed(analogRead(A0));
   
   Serial.begin(115200);
   Serial.println();
