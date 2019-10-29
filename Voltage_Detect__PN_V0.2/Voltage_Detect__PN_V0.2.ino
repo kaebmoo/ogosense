@@ -98,7 +98,7 @@ bool shouldSaveConfig = false;
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
 char mqtt_server[] = "mqtt.ogonan.com";
-char *clientID = "sensor/power/867123";
+char *clientID = "sensor/power/000004";
 
 
 // constants won't change. Used here to set a pin number:
@@ -125,7 +125,7 @@ int humidity = 0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 867123;
+unsigned long channelID = 000004;
 char* readAPIKey = "YBDBDH7FOD0NTLID";
 char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
@@ -257,6 +257,9 @@ void checkPowerLine()
       lastUpdateTime = millis();
       #ifdef THINGSPEAK
       writeSuccess = write2ThingSpeak();
+      if (writeSuccess != 200) {    
+        idTimer = timer.after(random(3000, 7000), write2ThingSpeakAgain);
+      }
       #endif
     }
   }
