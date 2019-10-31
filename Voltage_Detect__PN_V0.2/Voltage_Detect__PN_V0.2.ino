@@ -137,7 +137,7 @@ char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Acco
 String subscribeTopic = "node/" + String( channelID ) + "/control/messages";
 String publishTopic = "node/" + String( channelID ) + "/status/messages";
 
-
+const unsigned long alarmInterval = 60L * 1000L;
 const unsigned long postingInterval = 300L * 1000L;
 long lastUpdateTime = 0; 
 static const char alphanum[] ="0123456789"
@@ -180,7 +180,7 @@ void setup()
   #ifdef THINGSPEAK
   write2ThingSpeak();
   #endif
-  timerCheckBattery.every(15000, checkBattery);
+  timerCheckBattery.every(300000, checkBattery);
   // Serial.println("Delay Start 15 sec.");
   // delay(15000);
 }
@@ -249,7 +249,7 @@ void checkPowerLine()
       
       if (writeSuccess != 200) {                
         // Thingspeak
-        idTimer = timer.after(15000, write2ThingSpeakAgain);
+        idTimer = timer.after(alarmInterval, write2ThingSpeakAgain);
       }
       #endif
     }    
@@ -374,7 +374,7 @@ void powerLineOff()
   #ifdef THINGSPEAK
   writeSuccess = write2ThingSpeak();
   if (writeSuccess != 200) {    
-    idTimer = timer.after(15000, write2ThingSpeakAgain);
+    idTimer = timer.after(alarmInterval, write2ThingSpeakAgain);
   }
   #endif THINGSPEAK
   
@@ -392,7 +392,7 @@ void sendStatus()
   Alarm.enable(idAlarm);
   if (writeSuccess != 200) {
     Alarm.disable(idAlarm);
-    idTimer = timer.after(15000, write2ThingSpeakAgain);   
+    idTimer = timer.after(alarmInterval, write2ThingSpeakAgain);   
     Alarm.enable(idAlarm);
   }
 }
