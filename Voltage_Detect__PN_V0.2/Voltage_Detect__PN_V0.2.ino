@@ -138,7 +138,8 @@ char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Acco
 String subscribeTopic = "node/" + String( nodeID ) + "/control/messages";
 String publishTopic = "node/" + String( nodeID ) + "/status/messages";
 
-const unsigned long alarmInterval = 60L * 1000L;
+const unsigned long timerRepeat = 60; // second
+const unsigned long alarmInterval = timerRepeat * 1000L;
 const unsigned long postingInterval = 300L * 1000L;
 long lastUpdateTime = 0; 
 static const char alphanum[] ="0123456789"
@@ -380,7 +381,7 @@ void powerLineOff()
   #endif THINGSPEAK
   
   Serial.println("Power Line Down : Trigger");
-  idAlarm = Alarm.timerRepeat(15, sendStatus);
+  idAlarm = Alarm.timerRepeat(timerRepeat, sendStatus);
   Alarm.timerOnce(300, clearCounting);
 }
 
