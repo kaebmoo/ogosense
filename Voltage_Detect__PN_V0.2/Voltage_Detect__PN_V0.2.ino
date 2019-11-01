@@ -94,11 +94,12 @@ const int POWER = D7;
 //flag for saving data
 bool shouldSaveConfig = false;
 
-#define TOKEN "HMrHsdYzNC6TRShI3Nch"  // device token node 
+#define TOKEN "KMO2QD3D65fnJHYgBAD3"  // device token node 
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
 char mqtt_server[] = "mqtt.ogonan.com";
-char *clientID = "sensor/power/000004";
+char *clientID = "sensor/power/000105";
+unsigned long nodeID = 105;
 
 
 // constants won't change. Used here to set a pin number:
@@ -125,7 +126,7 @@ int humidity = 0;
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
-unsigned long channelID = 000004;
+unsigned long channelID = 867076;
 char* readAPIKey = "YBDBDH7FOD0NTLID";
 char* writeAPIKey = "LU07OLP4TQ5XVPOH";
 
@@ -134,8 +135,8 @@ char mqttUserName[] = "kaebmoo";  // Can be any name.
 char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Account > MyProfile.
 // String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
 // String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field5";
-String subscribeTopic = "node/" + String( channelID ) + "/control/messages";
-String publishTopic = "node/" + String( channelID ) + "/status/messages";
+String subscribeTopic = "node/" + String( nodeID ) + "/control/messages";
+String publishTopic = "node/" + String( nodeID ) + "/status/messages";
 
 const unsigned long alarmInterval = 60L * 1000L;
 const unsigned long postingInterval = 300L * 1000L;
@@ -334,7 +335,7 @@ int write2ThingSpeak()
   
   ThingSpeak.setField( 1, powerLine );
   ThingSpeak.setField( 2, batteryVoltage );
-  ThingSpeak.setField( 5, (long ) channelID );
+  ThingSpeak.setField( 5, (long ) nodeID );
   
   #ifdef ENVIRONMENT
   if (sht30.get() == 0) {
@@ -656,7 +657,7 @@ void sendThingsBoard(uint16_t power)
   // Prepare a JSON payload string
   String payload = "{";
   payload += "\"Power Line Detect\":"; payload += power; payload += ",";
-  payload += "\"Node\":"; payload += channelID; payload += ",";
+  payload += "\"Node\":"; payload += nodeID; payload += ",";
   payload += "\"Battery\":"; payload += batteryVoltage; payload += ",";
   payload += "\"Temperature\":"; payload += temperature; payload += ",";
   payload += "\"Humidity\":"; payload += humidity;
