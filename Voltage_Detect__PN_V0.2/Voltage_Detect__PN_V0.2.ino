@@ -81,6 +81,7 @@ V0.2 One thingspeak channel for all node
 
 SHT3X sht30(0x45);
 
+#define KEY            D3
 #define PIN            D4
 #define RELAYON        LOW
 #define RELAYOFF       HIGH
@@ -123,6 +124,13 @@ int idTimer;
 float batteryVoltage = 0.0;
 float temperature = 0.0;
 int humidity = 0;
+int key = 1; // switch on board
+int buttonState = HIGH; //this variable tracks the state of the button, high if not pressed, low if pressed
+int maintenanceState = -1; //this variable tracks the state of the Switch, negative if off, positive if on
+bool exitState = true;
+
+long lastDebounceTime = 0;  // the last time the output pin was toggled
+long debounceDelay = 50;    // the debounce time; increase if the output flickers
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
@@ -150,8 +158,8 @@ WiFiClient client;
 PubSubClient mqttClient(client); 
 
 AlarmId idAlarm;
-Timer timer, timerCheckBattery, timerSwitch;
-int idTimerSwitch;
+Timer timer, timerCheckBattery, timerSwitch, timerMaintenance;
+int idTimerSwitch, idTimerMaintenance;
 
 Adafruit_ADS1015 ads1015;
 
@@ -159,6 +167,7 @@ void setup()
 {
   // set the digital pin as output:
   pinMode(ledPin, OUTPUT);
+  pinMode(KEY, INPUT);
   pinMode(POWER, INPUT);
   pinMode(BATT, INPUT);
   pinMode(RELAY1, OUTPUT);
@@ -169,6 +178,9 @@ void setup()
   Serial.println();
   pixels.begin(); // This initializes the NeoPixel library.
   pixels.setBrightness(64);
+  pixels.show(); // This sends the updated pixel color to the hardware.
+  pixels.clear();
+  pixels.setPixelColor(0, pixels.Color(255, 255, 0)); 
   pixels.show(); // This sends the updated pixel color to the hardware.
 
   // ads1015.begin();
@@ -189,6 +201,29 @@ void setup()
 
 void loop() {
   // here is where you'd put code that needs to be running all the time.
+  // key = digitalRead(KEY);
+  readKey();
+  timerMaintenance.update();
+  if (maintenanceState > 0) {
+    // MA Mode
+    if (exitState == true) {
+      idTimerMaintenance = timerMaintenance.after(60000, exitMaintenance);
+      exitState = false;  
+      Serial.println("timer maintenance started.");
+    }
+    
+    if (digitalRead(POWER)) {
+      pixels.clear();
+      pixels.setPixelColor(0, pixels.Color(0, 255, 0)); 
+      pixels.show(); // This sends the updated pixel color to the hardware.  
+    }
+    else {
+      pixels.clear();
+      pixels.setPixelColor(0, pixels.Color(255, 0, 0)); 
+      pixels.show(); // This sends the updated pixel color to the hardware.  
+    }
+    return;
+  }
   
   blink();
 
@@ -294,6 +329,38 @@ void blink()
     // digitalWrite(ledPin, ledState);
     pixels.show(); // This sends the updated pixel color to the hardware.
   }
+}
+
+void readKey()
+{
+  //sample the state of the button - is it pressed or not?
+  buttonState = digitalRead(KEY);
+
+  //filter out any noise by setting a time buffer
+  if ( (millis() - lastDebounceTime) > debounceDelay) {
+
+    //if the button has been pressed, lets toggle the LED from "off to on" or "on to off"
+    if ( (buttonState == LOW) && (maintenanceState < 0) ) {
+
+      // digitalWrite(ledPin, HIGH); //turn LED on
+      maintenanceState = -maintenanceState; //now the LED is on, we need to change the state
+      lastDebounceTime = millis(); //set the current time
+    }
+    else if ( (buttonState == LOW) && (maintenanceState > 0) ) {
+
+      // digitalWrite(ledPin, LOW); //turn LED off
+      maintenanceState = -maintenanceState; //now the LED is off, we need to change the state
+      lastDebounceTime = millis(); //set the current time
+    }//close if/else
+
+  }//close if(time buffer)
+}
+
+void exitMaintenance()
+{
+  maintenanceState = -1;
+  timerMaintenance.stop(idTimerMaintenance);
+  exitState = true;
 }
 
 
@@ -486,6 +553,9 @@ void reconnect()
       mqttClient.subscribe("v1/devices/me/rpc/request/+");
     }
     else {
+      pixels.clear();
+      pixels.setPixelColor(0, pixels.Color(255, 255, 0)); 
+      pixels.show(); // This sends the updated pixel color to the hardware.
       Serial.print("failed, rc=");
       // Print to know why the connection failed.
       // See https://pubsubclient.knolleary.net/api.html#state for the failure code explanation.
