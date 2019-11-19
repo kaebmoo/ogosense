@@ -95,12 +95,12 @@ const int POWER = D7;
 //flag for saving data
 bool shouldSaveConfig = false;
 
-#define TOKEN "KMO2QD3D65fnJHYgBAD3"  // device token node 
+#define TOKEN "HMrHsdYzNC6TRShI3Nch"  // device token node 
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
 char mqtt_server[] = "mqtt.ogonan.com";
-char *clientID = "sensor/power/000105";
-unsigned long nodeID = 105;
+char *clientID = "sensor/power/000104";
+unsigned long nodeID = 104;
 
 
 // constants won't change. Used here to set a pin number:
@@ -130,7 +130,7 @@ int maintenanceState = -1; //this variable tracks the state of the Switch, negat
 bool exitState = true;
 
 long lastDebounceTime = 0;  // the last time the output pin was toggled
-long debounceDelay = 50;    // the debounce time; increase if the output flickers
+long debounceDelay = 250;    // the debounce time; increase if the output flickers
 
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
