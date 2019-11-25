@@ -78,6 +78,8 @@ V0.2 One thingspeak channel for all node
 //Install [Adafruit_NeoPixel_Library](https://github.com/adafruit/Adafruit_NeoPixel) first.
 #include <Adafruit_NeoPixel.h>
 #include <WEMOS_SHT3X.h>
+#include <EEPROM.h>
+#include <assert.h>
 
 SHT3X sht30(0x45);
 
@@ -95,11 +97,12 @@ const int POWER = D7;
 //flag for saving data
 bool shouldSaveConfig = false;
 
-#define TOKEN "HMrHsdYzNC6TRShI3Nch"  // device token node 
+// #define TOKEN "HMrHsdYzNC6TRShI3Nch"  // device token node 
+char TOKEN[] = "HMrHsdYzNC6TRShI3Nch";
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
 char mqtt_server[] = "mqtt.ogonan.com";
-char *clientID = "sensor/power/000104";
+char clientID[64] = "sensor/power/";
 unsigned long nodeID = 104;
 
 
@@ -135,8 +138,8 @@ long debounceDelay = 250;    // the debounce time; increase if the output flicke
 // ThingSpeak information
 char thingSpeakAddress[] = "api.thingspeak.com";
 unsigned long channelID = 867076;
-char* readAPIKey = "YBDBDH7FOD0NTLID";
-char* writeAPIKey = "LU07OLP4TQ5XVPOH";
+char readAPIKey[17] = "YBDBDH7FOD0NTLID";
+char writeAPIKey[17] = "LU07OLP4TQ5XVPOH";
 
 // const char* server = "mqtt.ogonan.com"; 
 char mqttUserName[] = "kaebmoo";  // Can be any name.
@@ -153,6 +156,13 @@ long lastUpdateTime = 0;
 static const char alphanum[] ="0123456789"
                               "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                               "abcdefghijklmnopqrstuvwxyz";  // For random generation of client ID.
+
+char c_writeapikey[17] = "";    // write api key thingspeak
+char c_readapikey[17] = "";     // read api key thingspeak
+char c_token[21] = "";           // authen token blynk
+char c_channelid[8] = "";       // channel id thingspeak
+char c_nodeid[8] = "";          // node id mqtt
+
                               
 WiFiClient client; 
 PubSubClient mqttClient(client); 
@@ -165,6 +175,10 @@ Adafruit_ADS1015 ads1015;
 
 void setup() 
 {
+  int saved;
+  
+  EEPROM.begin(512);
+  
   // set the digital pin as output:
   pinMode(ledPin, OUTPUT);
   pinMode(KEY, INPUT);
@@ -175,6 +189,50 @@ void setup()
   randomSeed(analogRead(A0));
   
   Serial.begin(115200);
+
+  EEPROM.get(28, writeAPIKey); // 28 + 17
+  EEPROM.get(45, readAPIKey);
+  // EEPROM.get(62, auth);
+  EEPROM.get(95, channelID);
+  EEPROM.get(103, nodeID);
+  EEPROM.get(112, TOKEN);
+  EEPROM.get(500, saved);
+  
+  Serial.println();
+  Serial.println("Configuration Read");
+  Serial.print("Saved = ");
+  Serial.println(saved);
+  
+  if (saved == 6550) {
+    strcpy(c_writeapikey,  writeAPIKey);
+    strcpy(c_readapikey, readAPIKey);
+    strcpy(c_token, TOKEN);
+    ltoa(channelID, c_channelid, 10); 
+    ltoa(nodeID, c_nodeid, 10);
+    
+
+    const int n = snprintf(NULL, 0, "%lu", nodeID);
+    assert(n > 0);
+    char buf[n+1];
+    int c = snprintf(buf, n+1, "%lu", nodeID);
+    assert(buf[n] == '\0');
+    assert(c == n);
+    strcat(clientID, buf);
+
+    Serial.print("Write API Key : ");
+    Serial.println(writeAPIKey);
+    Serial.print("Read API Key : ");
+    Serial.println(readAPIKey);
+    Serial.print("Channel ID : ");
+    Serial.println(channelID);
+    Serial.print("Node ID : ");
+    Serial.println(nodeID);
+    Serial.print("Device token : ");
+    Serial.println(TOKEN);
+    Serial.print("Client ID");
+    Serial.println(clientID);
+  }
+  
   Serial.println();
   pixels.begin(); // This initializes the NeoPixel library.
   pixels.setBrightness(64);
@@ -375,14 +433,27 @@ void setupWifi()
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
   WiFiManager wifiManager;
+  int saved = 6550;
 
   wifiManager.setBreakAfterConfig(true);
-  wifiManager.setConfigPortalTimeout(60);
+  wifiManager.setConfigPortalTimeout(120);
+
+  WiFiManagerParameter custom_c_writeapikey("c_writeapikey", "Write API Key : ThingSpeak", c_writeapikey, 17);
+  WiFiManagerParameter custom_c_readapikey("c_readapikey", "Read API Key : ThingSpeak", c_readapikey, 17);
+  WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
+  WiFiManagerParameter custom_c_nodeid("c_nodeid", "MQTT Node ID", c_nodeid, 8);
+  WiFiManagerParameter custom_c_token("c_token", "ThingsBoard Token", c_token, 21);
   
   //set config save notify callback
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  String alias = "ogosense-"+String(ESP.getChipId());
+  wifiManager.addParameter(&custom_c_writeapikey);
+  wifiManager.addParameter(&custom_c_readapikey);
+  wifiManager.addParameter(&custom_c_channelid);
+  wifiManager.addParameter(&custom_c_nodeid);
+  wifiManager.addParameter(&custom_c_token);
+
+  String alias = "ogoPowerLine-"+String(ESP.getChipId());
   if (!wifiManager.autoConnect(alias.c_str(), "")) {
     Serial.println("failed to connect and hit timeout");
     Alarm.delay(3000);
@@ -393,7 +464,69 @@ void setupWifi()
 
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
-  
+
+  Serial.print("Write API Key : ");
+  Serial.println(writeAPIKey);
+  Serial.print("Read API Key : ");
+  Serial.println(readAPIKey);
+  Serial.print("Channel ID : ");
+  Serial.println(channelID);
+  Serial.print("Node ID : ");
+  Serial.println(nodeID);
+  Serial.print("Device token : ");
+  Serial.println(TOKEN);
+
+  if (shouldSaveConfig) { //shouldSaveConfig
+    Serial.println("Saving config...");
+    strcpy(c_writeapikey, custom_c_writeapikey.getValue());
+    strcpy(c_readapikey, custom_c_readapikey.getValue());
+    strcpy(c_token, custom_c_token.getValue());
+    strcpy(c_channelid, custom_c_channelid.getValue());
+    strcpy(c_nodeid, custom_c_nodeid.getValue());
+
+    strcpy(writeAPIKey, c_writeapikey);
+    strcpy(readAPIKey, c_readapikey);
+    strcpy(TOKEN, c_token);
+    channelID = (unsigned long) atol(c_channelid);
+    nodeID = (unsigned long) atol(c_nodeid);
+
+    
+    const int n = snprintf(NULL, 0, "%lu", nodeID);
+    assert(n > 0);
+    char buf[n+1];
+    int c = snprintf(buf, n+1, "%lu", nodeID);
+    assert(buf[n] == '\0');
+    assert(c == n);
+    strcat(clientID, buf);
+
+    Serial.print("Write API Key : ");
+    Serial.println(writeAPIKey);
+    Serial.print("Read API Key : ");
+    Serial.println(readAPIKey);
+    Serial.print("Channel ID : ");
+    Serial.println(channelID);
+    Serial.print("Node ID : ");
+    Serial.println(nodeID);
+    Serial.print("Device token : ");
+    Serial.println(TOKEN);
+    Serial.print("Client ID : ");
+    Serial.println(clientID);
+
+    EEPROM.put(28, writeAPIKey);
+    EEPROM.put(45, readAPIKey);
+    EEPROM.put(95, channelID);
+    EEPROM.put(103, nodeID);
+    EEPROM.put(112, TOKEN);
+    EEPROM.put(500, saved);
+    
+    if (EEPROM.commit()) {
+      Serial.println("EEPROM successfully committed");
+    } else {
+      Serial.println("ERROR! EEPROM commit failed");
+    }
+
+    shouldSaveConfig = false;
+  }
   
 }
 
