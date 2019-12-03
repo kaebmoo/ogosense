@@ -551,6 +551,8 @@ int write2ThingSpeak()
   }
   else {
     Serial.println("Temperature Sensor Error!");
+    temperature = -1;
+    humidity = -1;
   }
   #endif
   
