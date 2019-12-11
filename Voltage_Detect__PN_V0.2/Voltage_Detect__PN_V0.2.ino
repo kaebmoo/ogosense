@@ -104,6 +104,7 @@ char thingsboardServer[] = "thingsboard.ogonan.com";           //
 char mqtt_server[] = "mqtt.ogonan.com";
 char clientID[64] = "sensor/power/";
 unsigned long nodeID = 104;
+int mqttCountReconnect = 0;
 
 
 // constants won't change. Used here to set a pin number:
@@ -697,6 +698,12 @@ void reconnect()
       Serial.print(mqttClient.state());
       Serial.println(" try again in 2 seconds");
       Alarm.delay(2000);
+      mqttCountReconnect++;
+      if (mqttCountReconnect >= 20) {
+        mqttCountReconnect = 0;
+        Serial.println("Reset..");
+        ESP.reset();
+      }
     }
     
     #endif
