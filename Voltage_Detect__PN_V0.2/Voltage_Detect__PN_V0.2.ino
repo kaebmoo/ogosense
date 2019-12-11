@@ -699,7 +699,7 @@ void reconnect()
       Serial.println(" try again in 2 seconds");
       Alarm.delay(2000);
       mqttCountReconnect++;
-      if (mqttCountReconnect >= 20) {
+      if (mqttCountReconnect >= 10) {
         mqttCountReconnect = 0;
         Serial.println("Reset..");
         ESP.reset();
