@@ -22,8 +22,8 @@
 #include <debug.h>
 
 
-#define WIFI_AP "Red"
-#define WIFI_PASSWORD "12345678"
+#define WIFI_AP "Red2"
+#define WIFI_PASSWORD "ogonan2019"
 
 #define TRIGGER_PIN D3
 #define PIN D4
@@ -50,7 +50,7 @@ PubSubClient mqttClient(sensorClient);
 char *myRoom = "sensor/trakool/light/1";
 int mqtt_reconnect = 0;
 
-#define TOKEN "ME1wm1gCqCirrHqofjir"  // device token a45GVxXw4HnJb6SwdwUT  box: UpF71PeawEvCvbY3cPwH pi0w: kgXTXXF5eceFJZ3V2WEw
+#define TOKEN "y5Swlk47hCiZ1nIPDlfx"  // device token a45GVxXw4HnJb6SwdwUT  box: UpF71PeawEvCvbY3cPwH pi0w: kgXTXXF5eceFJZ3V2WEw
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // "box.greenwing.email" "192.168.2.64"
 #define SENDINTERVAL  60000  // send data interval time
@@ -72,6 +72,7 @@ const int MAXRETRY=30;
 BH1750 lightMeter(0x23);
 LOLIN_HP303B HP303B;
 
+uint16_t lux;
 int32_t temperature;
 int32_t pressure;
 int16_t oversampling = 7;
@@ -187,6 +188,8 @@ void loop() {
   if ( millis() - lastSend > SENDINTERVAL ) { // Update and send only after SENDINTERVAL seconds
     readAndSendLightLevel();
     readAndSendBarometric();
+    sendThingsBoard();
+    // sendThingSpeak();  // be careful timeout in sending data to thingspeak
     lastSend = millis();
   }
 
@@ -244,25 +247,24 @@ void readAndSendLightLevel()
 {
   Serial.println("Collecting ambient light data.");
 
-  uint16_t lux = lightMeter.readLightLevel();
+  lux = lightMeter.readLightLevel();
   Serial.print("Light: ");
   Serial.print(lux);
   Serial.println(" lx");
-
-  sendThingsBoard(lux);
-  // sendThingSpeak(lux);  // be careful timeout in sending data to thingspeak
 }
 
-void sendThingsBoard(uint16_t lux)
+void sendThingsBoard()
 {
   // Just debug messages
-  Serial.print( "Sending ambient light : [" );
-  Serial.print( lux );
+  Serial.print( "Sending ambient light, temperature, pressure : [" );
+  Serial.print( lux ); Serial.print(", "); Serial.print( temperature ); Serial.print(", "); Serial.print( pressure );
   Serial.print( "]   -> " );
 
   // Prepare a JSON payload string
   String payload = "{";
   payload += "\"lux\":"; payload += lux; payload += ",";
+  payload += "\"temperature\":"; payload += temperature; payload += ",";
+  payload += "\"pressure\":"; payload += pressure; payload += ",";
   payload += "\"active\":"; payload += true;
   payload += "}";
 
@@ -274,7 +276,7 @@ void sendThingsBoard(uint16_t lux)
   Serial.println();
 }
 
-void sendThingSpeak(uint16_t lux)
+void sendThingSpeak()
 {
   Serial.println("Sending to thingspeak");
   ThingSpeak.setField( 1,  lux);
@@ -290,7 +292,7 @@ void ondemandWiFi()
 
     pixels.setPixelColor(0, 255, 0, 0); // red #FF0000
     pixels.show();
-    if (!wifiManager.startConfigPortal("ogoSense")) {
+    if (!wifiManager.startConfigPortal("ogoSense-lb")) {
       Serial.println("failed to connect and hit timeout");
       delay(3000);
       //reset and try again, or maybe put it to deep sleep
