@@ -74,6 +74,7 @@ LOLIN_HP303B HP303B;
 
 int32_t temperature;
 int32_t pressure;
+int16_t oversampling = 7;
 
 void setup(){
 
