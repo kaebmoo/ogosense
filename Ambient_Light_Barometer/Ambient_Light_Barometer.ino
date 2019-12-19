@@ -20,6 +20,7 @@
 // #include <SHA1.h>
 // #include <AuthClient.h>
 #include <debug.h>
+#include <EEPROM.h>
 
 
 #define WIFI_AP "Red2"
@@ -52,12 +53,25 @@ int mqtt_reconnect = 0;
 
 #define TOKEN "y5Swlk47hCiZ1nIPDlfx"  // device token a45GVxXw4HnJb6SwdwUT  box: UpF71PeawEvCvbY3cPwH pi0w: kgXTXXF5eceFJZ3V2WEw
 #define MQTTPORT  1883 // 1883 or 1888
-char thingsboardServer[] = "thingsboard.ogonan.com";           // "box.greenwing.email" "192.168.2.64"
 #define SENDINTERVAL  60000  // send data interval time
+
+char token[32] = "99999999999999999999";  // device token from thingsboard server
+int mqttport = 1883;
+char thingsboardServer[40] = "thingsboard.ogonan.com";           // "box.greenwing.email" "192.168.2.64"
+int sendinterval = 60000;                 // send data interval time
+
 
 unsigned long lastMqttConnectionAttempt = 0;
 unsigned long lastSend;
 const int MAXRETRY=30;
+
+char c_thingsboardServer[41] = "192.168.1.10";
+char c_mqttport[8] = "1883";
+char c_token[33] = "12345678901234567890";
+char c_sendinterval[8] = "10000";
+char c_auth[33] = "";           // authen token blynk
+
+char auth[] = "f40e4df0f10949a18c4728b973a1db1e";
 
 /*
 
@@ -77,10 +91,14 @@ int32_t temperature;
 int32_t pressure;
 int16_t oversampling = 7;
 
+int wifi_reconnect = 0;
+bool shouldSaveConfig = false;
+
 void setup(){
 
   Serial.begin(115200);
 
+  EEPROM.begin(512);
   // Initialize the I2C bus (BH1750 library doesn't do this automatically)
   Wire.begin();
   // On esp8266 you can select SCL and SDA pins using Wire.begin(D4, D3);
@@ -136,22 +154,30 @@ void setup(){
   pixels.setPixelColor(0, 255, 255, 0); // yellow #FFFF00
   pixels.show();
 
+  readConfig();
+  
   Serial.println();
   Serial.println();
   Serial.println(WiFi.SSID());
   Serial.println(WiFi.psk());
   String SSID = WiFi.SSID();
   String PSK = WiFi.psk();
-  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
+  WiFi.begin();
   Serial.print("Connecting");
   Serial.println();
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-    if ( digitalRead(TRIGGER_PIN) == LOW ) {
+    wifi_reconnect++;
+    if (wifi_reconnect > MAXRETRY) {
+      wifi_reconnect = 0;
       ondemandWiFi();
+      break;
     }
+    // if ( digitalRead(TRIGGER_PIN) == LOW ) {
+    //  ondemandWiFi();
+    // }
   }
   Serial.println();
   Serial.print("Connected, IP address: ");
@@ -185,7 +211,7 @@ void loop() {
     reconnect();
   }
 
-  if ( millis() - lastSend > SENDINTERVAL ) { // Update and send only after SENDINTERVAL seconds
+  if ( millis() - lastSend > sendinterval ) { // Update and send only after SENDINTERVAL seconds
     readAndSendLightLevel();
     readAndSendBarometric();
     sendThingsBoard();
@@ -286,9 +312,60 @@ void sendThingSpeak()
   Serial.println();
 }
 
+void readConfig()
+{
+  int saved;
+  
+  EEPROM.get(0, thingsboardServer);
+  EEPROM.get(80, c_mqttport);
+  EEPROM.get(44, token);
+  EEPROM.get(76, sendinterval);
+  EEPROM.get(100, auth);
+  EEPROM.get(500, saved);
+  mqttport = atoi(c_mqttport);
+
+  
+  if (saved == 6550) {
+    strcpy(c_thingsboardServer, thingsboardServer);    
+    itoa(mqttport, c_mqttport, 10);
+    strcpy(c_token, token);
+    itoa(sendinterval, c_sendinterval, 10);
+    strcpy(c_auth, auth);
+  }
+  Serial.println();
+  Serial.print("thingsboard server: ");
+  Serial.println(thingsboardServer);
+  Serial.print("mqtt port: ");
+  Serial.println(mqttport);
+  Serial.print("device token: ");
+  Serial.println(token);
+  Serial.print("send interval: ");
+  Serial.println(sendinterval);
+  Serial.print("blynk auth token: ");
+  Serial.println(auth);
+}
+
 void ondemandWiFi()
 {
     WiFiManager wifiManager;
+
+    wifiManager.setBreakAfterConfig(true);
+    
+    wifiManager.setConfigPortalTimeout(180);
+    
+    WiFiManagerParameter custom_mqtt_server("server", "mqtt server", c_thingsboardServer, 32);
+    WiFiManagerParameter custom_mqtt_port("port", "mqtt port", c_mqttport, 7);
+    WiFiManagerParameter custom_thingsboard_token("token", "thingsboard token", c_token, 32);
+    WiFiManagerParameter custom_sendinterval("interval", "send data interval time (ms)", c_sendinterval, 7);
+    WiFiManagerParameter custom_c_auth("c_auth", "Blynk Auth Token", c_auth, 32);
+
+    //set config save notify callback
+    wifiManager.setSaveConfigCallback(saveConfigCallback);
+    wifiManager.addParameter(&custom_mqtt_server);
+    wifiManager.addParameter(&custom_mqtt_port);
+    wifiManager.addParameter(&custom_thingsboard_token);
+    wifiManager.addParameter(&custom_sendinterval);
+    wifiManager.addParameter(&custom_c_auth);
 
     pixels.setPixelColor(0, 255, 0, 0); // red #FF0000
     pixels.show();
@@ -299,6 +376,8 @@ void ondemandWiFi()
       ESP.reset();
       delay(5000);
     }
+
+    
     //if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
     pixels.setPixelColor(0, 0, 0, 255); // blue #0000FF
@@ -312,17 +391,62 @@ void ondemandWiFi()
     delay(1000);
     pixels.setPixelColor(0, 0, 0, 0);
     pixels.show();
+
+    strcpy(c_thingsboardServer, custom_mqtt_server.getValue());
+    strcpy(c_mqttport, custom_mqtt_port.getValue());
+    strcpy(c_token, custom_thingsboard_token.getValue());
+    strcpy(c_sendinterval, custom_sendinterval.getValue());
+    strcpy(c_auth, custom_c_auth.getValue());
+
+    Serial.println("Saving configuration");
+    Serial.print("thingsboard server: ");
+    Serial.println(c_thingsboardServer);
+    Serial.print("mqtt port: ");
+    Serial.println(c_mqttport);
+    Serial.print("device token: ");
+    Serial.println(c_token);
+    Serial.print("send interval: ");
+    Serial.println(c_sendinterval);
+    Serial.print("blynk auth token: ");
+    Serial.println(c_auth);
+    if (shouldSaveConfig) {
+      strcpy(thingsboardServer, c_thingsboardServer);
+      mqttport = atoi(c_mqttport);
+      strcpy(token, c_token);
+      sendinterval = atoi(c_sendinterval);
+      strcpy(auth, c_auth);
+      
+      EEPROM.put(0, thingsboardServer);
+      EEPROM.put(80, c_mqttport);
+      EEPROM.put(44, token);
+      EEPROM.put(76, sendinterval);
+      EEPROM.put(100, auth);
+      EEPROM.put(500, 6550);
+      if (EEPROM.commit()) {
+        Serial.println("EEPROM successfully committed");
+      } else {
+        Serial.println("ERROR! EEPROM commit failed");
+      }
+      shouldSaveConfig = false;
+    }
+    
+}
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
 }
 
 
 void setup_mqtt() {
   #ifdef THINGSBOARD
-  mqttClient.setServer(thingsboardServer, MQTTPORT);  // default port 1883, mqtt_server, thingsboardServer
+  mqttClient.setServer(thingsboardServer, mqttport);  // default port 1883, mqtt_server, thingsboardServer
   #else
-  mqttClient.setServer(mqtt_server, MQTTPORT);
+  mqttClient.setServer(mqtt_server, mqttport);
   #endif
   mqttClient.setCallback(callback);
-  if (mqttClient.connect(myRoom, TOKEN, NULL)) {
+  if (mqttClient.connect(myRoom, token, NULL)) {
     // mqttClient.publish(roomStatus,"hello world");
 
     // mqttClient.subscribe(setmaxtemp);
@@ -439,7 +563,7 @@ bool reconnect() {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     #ifdef THINGSBOARD
-    if (mqttClient.connect(myRoom, TOKEN, NULL)) {  // connect to thingsboards
+    if (mqttClient.connect(myRoom, token, NULL)) {  // connect to thingsboards
     #else
     if (mqttClient.connect(myRoom, mqtt_user, mqtt_password)) {  // connect to thingsboards
     #endif
