@@ -66,6 +66,10 @@ disable voltage detect 2 sensors temperature/humidity and 1 relay
 #define TWOSENSORS
 // #define POWERLINE
 
+#include <Wire.h>
+#include <BH1750.h>
+#include <LOLIN_HP303B.h>
+
 #include <ESP8266WiFi.h> //https://github.com/esp8266/Arduino
 //needed for library
 #include <DNSServer.h>
@@ -84,7 +88,7 @@ disable voltage detect 2 sensors temperature/humidity and 1 relay
 #include <EEPROM.h>
 #include <assert.h>
 
-SHT3X sht30_0(0x45);
+SHT3X sht30_0(0x45);  // wemos sensor
 #ifdef TWOSENSORS
   SHT3X sht30_1(0x44);
 #endif
@@ -182,11 +186,29 @@ int idTimerSwitch, idTimerMaintenance;
 
 Adafruit_ADS1015 ads1015;
 
+/*
+
+  BH1750 can be physically configured to use two I2C addresses:
+    - 0x23 (most common) (if ADD pin had < 0.7VCC voltage)
+    - 0x5C (if ADD pin had > 0.7VCC voltage)
+
+  Library uses 0x23 address as default, but you can define any other address.
+  If you had troubles with default value - try to change it to 0x5C.
+
+*/
+BH1750 lightMeter(0x23);
+LOLIN_HP303B HP303B;
+
+uint16_t lux;
+int32_t pressure;
+int16_t oversampling = 7;
+
 void setup() 
 {
   int saved;
   
   EEPROM.begin(512);
+  
   
   // set the digital pin as output:
   pinMode(ledPin, OUTPUT);
@@ -198,6 +220,7 @@ void setup()
   randomSeed(analogRead(A0));
   
   Serial.begin(115200);
+  Wire.begin();
 
   EEPROM.get(28, writeAPIKey); // 28 + 17
   EEPROM.get(45, readAPIKey);
@@ -251,6 +274,11 @@ void setup()
   pixels.show(); // This sends the updated pixel color to the hardware.
 
   ads1015.begin();
+  initLightMeter();
+  //Address of the HP303B (0x77 or 0x76)
+  // barometer
+  HP303B.begin(); // I2C address = 0x77
+  
   setupWifi();
   ThingSpeak.begin( client );
   #if defined(MQTT) || defined(THINGSBOARD)
@@ -320,6 +348,108 @@ void loop() {
   
   #endif
  
+}
+
+void initLightMeter()
+{
+    /*
+
+    BH1750 has six different measurement modes. They are divided in two groups;
+    continuous and one-time measurements. In continuous mode, sensor continuously
+    measures lightness value. In one-time mode the sensor makes only one
+    measurement and then goes into Power Down mode.
+
+    Each mode, has three different precisions:
+
+      - Low Resolution Mode - (4 lx precision, 16ms measurement time)
+      - High Resolution Mode - (1 lx precision, 120ms measurement time)
+      - High Resolution Mode 2 - (0.5 lx precision, 120ms measurement time)
+
+    By default, the library uses Continuous High Resolution Mode, but you can
+    set any other mode, by passing it to BH1750.begin() or BH1750.configure()
+    functions.
+
+    [!] Remember, if you use One-Time mode, your sensor will go to Power Down
+    mode each time, when it completes a measurement and you've read it.
+
+    Full mode list:
+
+      BH1750_CONTINUOUS_LOW_RES_MODE
+      BH1750_CONTINUOUS_HIGH_RES_MODE (default)
+      BH1750_CONTINUOUS_HIGH_RES_MODE_2
+
+      BH1750_ONE_TIME_LOW_RES_MODE
+      BH1750_ONE_TIME_HIGH_RES_MODE
+      BH1750_ONE_TIME_HIGH_RES_MODE_2
+
+  */
+
+  // begin returns a boolean that can be used to detect setup problems.
+  if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+    Serial.println(F("BH1750 Advanced begin"));
+  }
+  else {
+    Serial.println(F("Error initialising BH1750"));
+  }
+
+}
+
+void readBarometric()
+{
+  int16_t ret;
+  int32_t _temperature;
+
+  Serial.println();
+
+  //lets the HP303B perform a Single temperature measurement with the last (or standard) configuration
+  //The result will be written to the paramerter temperature
+  //ret = HP303B.measureTempOnce(temperature);
+  //the commented line below does exactly the same as the one above, but you can also config the precision
+  //oversampling can be a value from 0 to 7
+  //the HP303B will perform 2^oversampling internal temperature measurements and combine them to one result with higher precision
+  //measurements with higher precision take more time, consult datasheet for more information
+  ret = HP303B.measureTempOnce(_temperature, oversampling);
+
+  if (ret != 0)
+  {
+      //Something went wrong.
+      //Look at the library code for more information about return codes
+      Serial.print("FAIL! ret = ");
+      Serial.println(ret);
+  }
+  else
+  {
+      Serial.print("Temperature: ");
+      Serial.print(_temperature);
+      Serial.println(" degrees of Celsius");
+  }
+
+  //Pressure measurement behaves like temperature measurement
+  //ret = HP303B.measurePressureOnce(pressure);
+  ret = HP303B.measurePressureOnce(pressure, oversampling);
+  if (ret != 0)
+  {
+      //Something went wrong.
+      //Look at the library code for more information about return codes
+      Serial.print("FAIL! ret = ");
+      Serial.println(ret);
+  }
+  else
+  {
+      Serial.print("Pressure: ");
+      Serial.print(pressure);
+      Serial.println(" Pascal");
+  }
+}
+
+void readLightLevel()
+{
+  Serial.println("Collecting ambient light data.");
+
+  lux = lightMeter.readLightLevel();
+  Serial.print("Light: ");
+  Serial.print(lux);
+  Serial.println(" lx");
 }
 
 void checkPowerLine()
@@ -589,11 +719,18 @@ int write2ThingSpeak()
 
 void readEnvironment()
 {
-  #ifdef ENVIRONMENT
+  readLightLevel();
+  readBarometric();
+  readTemperatureHumidity();
+}
+
+void readTemperatureHumidity()
+{
+    #ifdef ENVIRONMENT
   if (sht30_0.get() == 0) {
     temperature = sht30_0.cTemp;
     humidity = sht30_0.humidity;
-    Serial.print("External");
+    Serial.print("Internal ");
     Serial.print("Temperature: ");
     Serial.println(temperature);
     Serial.print("Humidity: ");
@@ -610,7 +747,7 @@ void readEnvironment()
   if (sht30_1.get() == 0) {
     temperature_1 = sht30_1.cTemp;
     humidity_1 = sht30_1.humidity;
-    Serial.print("Internal");
+    Serial.print("External ");
     Serial.print("Temperature: ");
     Serial.println(temperature_1);
     Serial.print("Humidity: ");
