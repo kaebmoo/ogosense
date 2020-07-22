@@ -15,7 +15,7 @@
 #include <ThingSpeak.h>
 #include <ArduinoJson.h>
 // #include <MicroGear.h>
-#include <MQTTClient.h>
+// #include <MQTTClient.h>
 #include <PubSubClient.h>
 // #include <SHA1.h>
 // #include <AuthClient.h>
@@ -63,7 +63,7 @@ int sendinterval = 60000;                 // send data interval time
 
 unsigned long lastMqttConnectionAttempt = 0;
 unsigned long lastSend;
-const int MAXRETRY=30;
+const int MAXRETRY=60;
 
 char c_thingsboardServer[41] = "192.168.1.10";
 char c_mqttport[8] = "1883";
