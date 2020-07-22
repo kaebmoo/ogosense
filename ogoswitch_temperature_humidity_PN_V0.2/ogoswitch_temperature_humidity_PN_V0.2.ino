@@ -112,7 +112,7 @@ char TOKEN[] = "HMrHsdYzNC6TRShI3Nch";
 #define MQTTPORT  1883 // 1883 or 1888
 char thingsboardServer[] = "thingsboard.ogonan.com";           // 
 char mqtt_server[] = "mqtt.ogonan.com";
-char clientID[64] = "sensor/power/";
+char clientID[64] = "sensor/environment/";
 unsigned long nodeID = 104;
 int mqttCountReconnect = 0;
 
@@ -261,7 +261,7 @@ void setup()
     Serial.println(nodeID);
     Serial.print("Device token : ");
     Serial.println(TOKEN);
-    Serial.print("Client ID");
+    Serial.print("Client ID : ");
     Serial.println(clientID);
   }
   
