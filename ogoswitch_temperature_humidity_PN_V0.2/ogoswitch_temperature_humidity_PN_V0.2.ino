@@ -107,10 +107,10 @@ const int POWER = D7;
 //flag for saving data
 bool shouldSaveConfig = false;
 
-// #define TOKEN "HMrHsdYzNC6TRShI3Nch"  // device token node 
+// #define TOKEN "HMrHsdYzNC6TRShI3Nch"  // device token node
 char TOKEN[] = "HMrHsdYzNC6TRShI3Nch";
 #define MQTTPORT  1883 // 1883 or 1888
-char thingsboardServer[] = "thingsboard.ogonan.com";           // 
+char thingsboardServer[] = "thingsboard.ogonan.com";           //
 char mqtt_server[] = "mqtt.ogonan.com";
 char clientID[64] = "sensor/environment/";
 unsigned long nodeID = 104;
@@ -145,6 +145,13 @@ int buttonState = HIGH; //this variable tracks the state of the button, high if 
 int maintenanceState = -1; //this variable tracks the state of the Switch, negative if off, positive if on
 bool exitState = true;
 
+// soil moisture variables
+int minADC = 0;                       // replace with min ADC value read in air
+int maxADC = 945;                     // replace with max ADC value read fully submerged in water
+int soilMoistureSetPoint = 50;
+int soilMoisture;
+int range = 20;
+
 long lastDebounceTime = 0;  // the last time the output pin was toggled
 long debounceDelay = 250;    // the debounce time; increase if the output flickers
 
@@ -154,7 +161,7 @@ unsigned long channelID = 867076;
 char readAPIKey[17] = "YBDBDH7FOD0NTLID";
 char writeAPIKey[17] = "LU07OLP4TQ5XVPOH";
 
-// const char* server = "mqtt.ogonan.com"; 
+// const char* server = "mqtt.ogonan.com";
 char mqttUserName[] = "kaebmoo";  // Can be any name.
 char mqttPass[] = "sealwiththekiss";  // Change this your MQTT API Key from Account > MyProfile.
 // String subscribeTopic = "channels/" + String( channelID ) + "/subscribe/fields/field3";
@@ -165,7 +172,7 @@ String publishTopic = "node/" + String( nodeID ) + "/status/messages";
 const unsigned long timerRepeat = 60; // second
 const unsigned long alarmInterval = timerRepeat * 1000L;
 const unsigned long postingInterval = 300L * 1000L;
-long lastUpdateTime = 0; 
+long lastUpdateTime = 0;
 static const char alphanum[] ="0123456789"
                               "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                               "abcdefghijklmnopqrstuvwxyz";  // For random generation of client ID.
@@ -176,9 +183,9 @@ char c_token[21] = "";           // authen token blynk
 char c_channelid[8] = "";       // channel id thingspeak
 char c_nodeid[8] = "";          // node id mqtt
 
-                              
-WiFiClient client; 
-PubSubClient mqttClient(client); 
+
+WiFiClient client;
+PubSubClient mqttClient(client);
 
 AlarmId idAlarm;
 Timer timer, timerCheckBattery, timerSwitch, timerMaintenance, timerEnvironment;
@@ -203,13 +210,13 @@ uint16_t lux;
 int32_t pressure;
 int16_t oversampling = 7;
 
-void setup() 
+void setup()
 {
   int saved;
-  
+
   EEPROM.begin(512);
-  
-  
+
+
   // set the digital pin as output:
   pinMode(ledPin, OUTPUT);
   pinMode(KEY, INPUT);
@@ -218,7 +225,7 @@ void setup()
   pinMode(RELAY1, OUTPUT);
   digitalWrite(RELAY1, HIGH);
   randomSeed(analogRead(A0));
-  
+
   Serial.begin(115200);
   Wire.begin();
 
@@ -229,19 +236,19 @@ void setup()
   EEPROM.get(103, nodeID);
   EEPROM.get(112, TOKEN);
   EEPROM.get(500, saved);
-  
+
   Serial.println();
   Serial.println("Configuration Read");
   Serial.print("Saved = ");
   Serial.println(saved);
-  
+
   if (saved == 6550) {
     strcpy(c_writeapikey,  writeAPIKey);
     strcpy(c_readapikey, readAPIKey);
     strcpy(c_token, TOKEN);
-    ltoa(channelID, c_channelid, 10); 
+    ltoa(channelID, c_channelid, 10);
     ltoa(nodeID, c_nodeid, 10);
-    
+
 
     const int n = snprintf(NULL, 0, "%lu", nodeID);
     assert(n > 0);
@@ -264,13 +271,13 @@ void setup()
     Serial.print("Client ID : ");
     Serial.println(clientID);
   }
-  
+
   Serial.println();
   pixels.begin(); // This initializes the NeoPixel library.
   pixels.setBrightness(64);
   pixels.show(); // This sends the updated pixel color to the hardware.
   pixels.clear();
-  pixels.setPixelColor(0, pixels.Color(255, 255, 0)); 
+  pixels.setPixelColor(0, pixels.Color(255, 255, 0));
   pixels.show(); // This sends the updated pixel color to the hardware.
 
   ads1015.begin();
@@ -278,19 +285,19 @@ void setup()
   //Address of the HP303B (0x77 or 0x76)
   // barometer
   HP303B.begin(); // I2C address = 0x77
-  
+
   setupWifi();
   ThingSpeak.begin( client );
   #if defined(MQTT) || defined(THINGSBOARD)
   setupMqtt();
-  #endif 
+  #endif
 
   //  #ifdef POWERLINE
   //  checkPowerLine();
   //  #endif
   checkBattery();
   readEnvironment();
-  
+
   #ifdef THINGSPEAK
   write2ThingSpeak();
   #endif
@@ -309,29 +316,29 @@ void loop() {
     // MA Mode
     if (exitState == true) {
       idTimerMaintenance = timerMaintenance.after(60000, exitMaintenance);
-      exitState = false;  
+      exitState = false;
       Serial.println("timer maintenance started.");
     }
-    
+
     if (digitalRead(POWER)) {
       pixels.clear();
-      pixels.setPixelColor(0, pixels.Color(0, 255, 0)); 
-      pixels.show(); // This sends the updated pixel color to the hardware.  
+      pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+      pixels.show(); // This sends the updated pixel color to the hardware.
     }
     else {
       pixels.clear();
-      pixels.setPixelColor(0, pixels.Color(255, 0, 0)); 
-      pixels.show(); // This sends the updated pixel color to the hardware.  
+      pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+      pixels.show(); // This sends the updated pixel color to the hardware.
     }
     return;
   }
-  
+
   blink();
 
   //  #ifdef POWERLINE
   //  checkPowerLine();
   //  #endif
-  
+
   Alarm.delay(200);
   timer.update();
   timerCheckBattery.update();
@@ -340,14 +347,14 @@ void loop() {
 
   #if defined(MQTT) || defined(THINGSBOARD)
   // Reconnect if MQTT client is not connected.
-  if (!mqttClient.connected()) 
+  if (!mqttClient.connected())
   {
     reconnect();
   }
   mqttClient.loop();   // Call the loop continuously to establish connection to the server.
-  
+
   #endif
- 
+
 }
 
 void initLightMeter()
@@ -449,13 +456,13 @@ void readLightLevel()
   lux = lightMeter.readLightLevel();
   Serial.print("Light: ");
   Serial.print(lux);
-  Serial.println(" lx");
+  Serial.print(" lx");
 }
 
 void checkPowerLine()
 {
   int writeSuccess;
-  
+
   // powerPin = analogRead(A0);
   powerPin = digitalRead(POWER);
   Serial.print("Digital Read: ");
@@ -468,9 +475,9 @@ void checkPowerLine()
 
   if (powerPin == 0) {
     Serial.println("WTF!!!");
-    pixels.setPixelColor(0, pixels.Color(255, 0, 0)); 
+    pixels.setPixelColor(0, pixels.Color(255, 0, 0));
     pixels.show(); // This sends the updated pixel color to the hardware.
-    
+
     powerLine = 0;
     if (countOff == 0) {
       powerLineOff();
@@ -479,7 +486,7 @@ void checkPowerLine()
   }
   else if (powerPin == 1) {                // without battery = 2.29, with battery 2.4
     Serial.println("Power line OK");
-    // pixels.setPixelColor(0, pixels.Color(0, 255, 0)); 
+    // pixels.setPixelColor(0, pixels.Color(0, 255, 0));
     // pixels.show(); // This sends the updated pixel color to the hardware.
     powerLine = 1;
     if (countOff > 0) {
@@ -490,20 +497,20 @@ void checkPowerLine()
       readEnvironment();
       #ifdef THINGSPEAK
       writeSuccess = write2ThingSpeak();
-      
-      if (writeSuccess != 200) {                
+
+      if (writeSuccess != 200) {
         // Thingspeak
         idTimer = timer.after(alarmInterval, write2ThingSpeakAgain);
       }
       #endif
-    }    
-    
+    }
+
     if (millis() - lastUpdateTime >=  postingInterval) {
       lastUpdateTime = millis();
       readEnvironment();
       #ifdef THINGSPEAK
       writeSuccess = write2ThingSpeak();
-      if (writeSuccess != 200) {    
+      if (writeSuccess != 200) {
         idTimer = timer.after(random(3000, 7000), write2ThingSpeakAgain);
       }
       #endif
@@ -513,7 +520,7 @@ void checkPowerLine()
 
 void blink()
 {
-    
+
   // check to see if it's time to blink the LED; that is, if the difference
   // between the current time and last time you blinked the LED is bigger than
   // the interval at which you want to blink the LED.
@@ -526,11 +533,11 @@ void blink()
     // if the LED is off turn it on and vice-versa:
     if (ledState == LOW) {
       ledState = HIGH;
-      pixels.clear(); 
+      pixels.clear();
 
     } else {
       ledState = LOW;
-      pixels.setPixelColor(0, pixels.Color(0, 0, 255)); 
+      pixels.setPixelColor(0, pixels.Color(0, 0, 255));
     }
 
     // set the LED with the ledState of the variable:
@@ -593,7 +600,7 @@ void setupWifi()
   WiFiManagerParameter custom_c_channelid("c_channelid", "Channel ID", c_channelid, 8);
   WiFiManagerParameter custom_c_nodeid("c_nodeid", "MQTT Node ID", c_nodeid, 8);
   WiFiManagerParameter custom_c_token("c_token", "ThingsBoard Token", c_token, 21);
-  
+
   //set config save notify callback
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
@@ -640,7 +647,7 @@ void setupWifi()
     channelID = (unsigned long) atol(c_channelid);
     nodeID = (unsigned long) atol(c_nodeid);
 
-    
+
     const int n = snprintf(NULL, 0, "%lu", nodeID);
     assert(n > 0);
     char buf[n+1];
@@ -668,7 +675,7 @@ void setupWifi()
     EEPROM.put(103, nodeID);
     EEPROM.put(112, TOKEN);
     EEPROM.put(500, saved);
-    
+
     if (EEPROM.commit()) {
       Serial.println("EEPROM successfully committed");
     } else {
@@ -677,51 +684,56 @@ void setupWifi()
 
     shouldSaveConfig = false;
   }
-  
+
 }
 
 
 int write2ThingSpeak()
 {
-  
-  ThingSpeak.setField( 1, powerLine );
-  ThingSpeak.setField( 2, batteryVoltage );
-  ThingSpeak.setField( 5, (long ) nodeID );
-  
+  #ifdef TWOSENSORS
+  ThingSpeak.setField( 1, temperature_1 );
+  ThingSpeak.setField( 2, humidity_1 );
+  #endif
+
   ThingSpeak.setField( 3, temperature );
   ThingSpeak.setField( 4, humidity );
 
-  #ifdef TWOSENSORS
-    ThingSpeak.setField( 6, temperature_1 );
-    ThingSpeak.setField( 7, humidity_1 );
-  #endif
+  ThingSpeak.setField( 5, lux );
+  // ThingSpeak.setField( 5, (long ) nodeID );
 
-  
+
+    ThingSpeak.setField( 6, pressure );
+    ThingSpeak.setField( 7, soilMoisture );
+
+
+
   #ifdef THINGSBOARD
     #ifdef POWERLINE
     Serial.println("Sending data to ThingsBoard");
     sendThingsBoard(powerLine);
     #endif
   #endif
-  
+
   Serial.println("Sending data to ThingSpeak");
   #ifdef POWERLINE
   Serial.print("Power Line Status:");
   Serial.println(powerLine);
   #endif
-  
+
   int writeSuccess = ThingSpeak.writeFields( channelID, writeAPIKey );
   Serial.print("Send to Thingspeak status: ");
   Serial.println(writeSuccess);
-  
+
   return writeSuccess;
 }
 
 void readEnvironment()
 {
+  Serial.println();
   readLightLevel();
   readBarometric();
   readTemperatureHumidity();
+  readSoilMoisture();
 }
 
 void readTemperatureHumidity()
@@ -735,7 +747,7 @@ void readTemperatureHumidity()
     Serial.println(temperature);
     Serial.print("Humidity: ");
     Serial.println(humidity);
-    
+
   }
   else {
     Serial.println("Temperature Sensor Error!");
@@ -752,7 +764,7 @@ void readTemperatureHumidity()
     Serial.println(temperature_1);
     Serial.print("Humidity: ");
     Serial.println(humidity_1);
-    
+
   }
   else {
     Serial.println("Temperature Sensor Error!");
@@ -761,7 +773,7 @@ void readTemperatureHumidity()
   }
 
   #endif  // TWOSENSORS
-  
+
   #endif  // ENVIRONMENT
 }
 
@@ -772,11 +784,11 @@ void powerLineOff()
   readEnvironment();
   #ifdef THINGSPEAK
   writeSuccess = write2ThingSpeak();
-  if (writeSuccess != 200) {    
+  if (writeSuccess != 200) {
     idTimer = timer.after(alarmInterval, write2ThingSpeakAgain);
   }
   #endif THINGSPEAK
-  
+
   Serial.println("Power Line Down : Trigger");
   idAlarm = Alarm.timerRepeat(timerRepeat, sendStatus);
   Alarm.timerOnce(300, clearCounting);
@@ -792,7 +804,7 @@ void sendStatus()
   Alarm.enable(idAlarm);
   if (writeSuccess != 200) {
     Alarm.disable(idAlarm);
-    idTimer = timer.after(alarmInterval, write2ThingSpeakAgain);   
+    idTimer = timer.after(alarmInterval, write2ThingSpeakAgain);
     Alarm.enable(idAlarm);
   }
 }
@@ -817,9 +829,9 @@ void write2ThingSpeakAgain()
 void checkBattery()
 {
   int16_t adc0;
-  
-  
-  // 
+
+
+  //
   adc0 = analogRead(BATT);
   batteryVoltage = ((float) adc0 * 4.52) / 1023;
   Serial.print("Analog read A0: ");
@@ -829,16 +841,21 @@ void checkBattery()
   Serial.println(batteryVoltage);
 }
 
-void soilMoisture()
+void readSoilMoisture()
 {
   int16_t adcSoil0;
-  
+
   adcSoil0 = ads1015.readADC_SingleEnded(0);
   Serial.print("Analog read A0: ");
   Serial.println(adcSoil0);
+
+  soilMoisture = map(adcSoil0, minADC, maxADC, 0, 100);
+  // print mapped results to the serial monitor:
+  Serial.print("Moisture value = " );
+  Serial.println(soilMoisture);
 }
 
-void setupMqtt() 
+void setupMqtt()
 {
 
   #ifdef THINGSBOARD
@@ -846,12 +863,12 @@ void setupMqtt()
   mqttClient.setCallback(callback);
   if (mqttClient.connect(clientID, TOKEN, NULL)) {
     mqttClient.subscribe("v1/devices/me/rpc/request/+");
-    Serial.print("mqtt connected : ");    
+    Serial.print("mqtt connected : ");
     Serial.println(thingsboardServer);  // mqtt_server
-    
+
   }
   #endif
-  
+
   #ifdef MQTT
   Serial.print(mqtt_server); Serial.print(" "); Serial.println(MQTTPORT);
   mqttClient.setCallback(callback);
@@ -864,9 +881,9 @@ void setupMqtt()
   #endif
 }
 
-void reconnect() 
+void reconnect()
 {
-  
+
   // Loop until reconnected.
   // while (!mqttClient.connected()) {
   // }
@@ -880,22 +897,22 @@ void reconnect()
     }
     clientID[8]='\0';
     */
-    
+
     // Connect to the MQTT broker
     #ifdef THINGSBOARD
     mqttClient.setServer(thingsboardServer, MQTTPORT);
     if (mqttClient.connect(clientID, TOKEN, NULL)) {
       Serial.print("Connected with Client ID:  ");
-      Serial.print(String(clientID));  
+      Serial.print(String(clientID));
       Serial.print(", Token: ");
       Serial.print(TOKEN);
-      
+
       // Subscribing to receive RPC requests
       mqttClient.subscribe("v1/devices/me/rpc/request/+");
     }
     else {
       pixels.clear();
-      pixels.setPixelColor(0, pixels.Color(255, 255, 0)); 
+      pixels.setPixelColor(0, pixels.Color(255, 255, 0));
       pixels.show(); // This sends the updated pixel color to the hardware.
       Serial.print("failed, rc=");
       // Print to know why the connection failed.
@@ -910,9 +927,9 @@ void reconnect()
         ESP.reset();
       }
     }
-    
+
     #endif
-    
+
     #ifdef MQTT
     mqttClient.setServer(mqtt_server, MQTTPORT);
     if (mqttClient.connect(clientID,mqttUserName,mqttPass)) {
@@ -921,7 +938,7 @@ void reconnect()
       Serial.print(", Username: ");
       Serial.print(mqttUserName);
       Serial.print(" , Passwword: ");
-      Serial.println(mqttPass);  
+      Serial.println(mqttPass);
       mqttClient.subscribe( subscribeTopic.c_str() );
     }
     else {
@@ -932,20 +949,20 @@ void reconnect()
       Serial.println(" try again in 2 seconds");
       Alarm.delay(2000);
     }
-    #endif  
-   
+    #endif
+
 }
 
-void callback(char* topic, byte* payload, unsigned int length) 
+void callback(char* topic, byte* payload, unsigned int length)
 {
   // mosquitto_pub -h mqtt.ogonan.com -t "/channels/867076/subscribe/messages" -u "user" -P "pass"  -m "off"
   // mosquitto_sub -h mqtt.ogonan.com -t "/channels/867076/publish/messages" -u "user" -P "pass"
   // mosquitto_sub -h mqtt.ogonan.com -t "/channels/867076/subscribe/messages" -u "user" -P "pass"
   #ifdef THINGSBOARD
-  
-  
+
+
   Serial.println("On message");
-  
+
   char json[length + 1];
   strncpy (json, (char*)payload, length);
   json[length] = '\0';
@@ -967,18 +984,18 @@ void callback(char* topic, byte* payload, unsigned int length)
 
   String relayStatus;
   String responseTopic;
-  
+
   // Check request method
   String methodName = String((const char*)data["method"]);
   String valueName = String((const char *) data["params"]);
 
-  if (methodName.equals("turnOff")) 
+  if (methodName.equals("turnOff"))
   {
     // Update GPIO status and reply
     digitalWrite(RELAY1, RELAYOFF);
-    
+
   }
-  else if (methodName.equals("setRelay")) 
+  else if (methodName.equals("setRelay"))
   {
     // Update GPIO status and reply
     if (valueName.equals("1")) {
@@ -994,7 +1011,7 @@ void callback(char* topic, byte* payload, unsigned int length)
     }
     relayStatus = String(digitalRead(RELAY1) ? 0 : 1, DEC);
     responseTopic = String(topic);
-    
+
     responseTopic.replace("request", "response");
     mqttClient.publish(responseTopic.c_str(), relayStatus.c_str());
     String message = "{\"Relay Status\":" + relayStatus + "}";
@@ -1007,7 +1024,7 @@ void callback(char* topic, byte* payload, unsigned int length)
   else if (methodName.equals("getValue")) {
     relayStatus = String(digitalRead(RELAY1) ? 0 : 1, DEC);
     responseTopic = String(topic);
-    
+
     responseTopic.replace("request", "response");
     mqttClient.publish(responseTopic.c_str(), relayStatus.c_str());
     String message = "{\"Relay Status\":" + relayStatus + "}";
@@ -1017,7 +1034,7 @@ void callback(char* topic, byte* payload, unsigned int length)
     Serial.print(" : message ");
     Serial.println(message);
   }
-  
+
   #endif
 
   #ifdef MQTT
@@ -1047,11 +1064,11 @@ void callback(char* topic, byte* payload, unsigned int length)
   msgBuffer = relayStatus.c_str();
   Serial.print("Status Logic: ");
   Serial.println(msgBuffer);
-  
+
   const char *topicBuffer;
   topicBuffer = publishTopic.c_str();
   mqttClient.publish( topicBuffer, msgBuffer );
-  
+
   #endif
 }
 
@@ -1066,7 +1083,7 @@ void sendThingsBoard(uint16_t power)
   // char buf[32];
 
   // ltoa(channelID, buf, 10);
-  
+
   // Just debug messages
   Serial.print( "Sending power status : [" );
   Serial.print( power );
