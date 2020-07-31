@@ -61,7 +61,7 @@ disable voltage detect 2 sensors temperature/humidity and 1 relay
 
 // #define THINGSBOARD
 // #define MQTT
-// #define THINGSPEAK
+#define THINGSPEAK
 #define ENVIRONMENT
 #define TWOSENSORS
 // #define POWERLINE
@@ -188,7 +188,7 @@ WiFiClient client;
 PubSubClient mqttClient(client);
 
 AlarmId idAlarm;
-Timer timer, timerCheckBattery, timerSwitch, timerMaintenance, timerEnvironment;
+Timer timer, timerCheckBattery, timerSwitch, timerMaintenance, timerEnvironment, timerThingSpeak;
 int idTimerSwitch, idTimerMaintenance;
 
 Adafruit_ADS1015 ads1015;
@@ -303,15 +303,20 @@ void setup()
   #endif
   timerCheckBattery.every(300000, checkBattery);
   timerEnvironment.every(5000, readEnvironment);
+  
+  
   // Serial.println("Delay Start 15 sec.");
   // delay(15000);
 }
 
 void loop() {
+  int writeSuccess;
+  
   // here is where you'd put code that needs to be running all the time.
   // key = digitalRead(KEY);
   readKey();
   timerMaintenance.update();
+  /*
   if (maintenanceState > 0) {
     // MA Mode
     if (exitState == true) {
@@ -332,6 +337,7 @@ void loop() {
     }
     return;
   }
+  */
 
   blink();
 
@@ -339,11 +345,12 @@ void loop() {
   //  checkPowerLine();
   //  #endif
 
-  Alarm.delay(200);
+  // Alarm.delay(200);
   timer.update();
   timerCheckBattery.update();
   timerSwitch.update();
   timerEnvironment.update();
+  timerThingSpeak.update();
 
   #if defined(MQTT) || defined(THINGSBOARD)
   // Reconnect if MQTT client is not connected.
@@ -354,6 +361,17 @@ void loop() {
   mqttClient.loop();   // Call the loop continuously to establish connection to the server.
 
   #endif
+
+  if (millis() - lastUpdateTime >=  postingInterval) {
+      lastUpdateTime = millis();
+      readTemperatureHumidity();
+      #ifdef THINGSPEAK
+      writeSuccess = write2ThingSpeak();
+      if (writeSuccess != 200) {
+        idTimer = timer.after(random(3000, 7000), write2ThingSpeakAgain);
+      }
+      #endif
+  }
 
 }
 
@@ -494,7 +512,7 @@ void checkPowerLine()
       idAlarm = dtINVALID_ALARM_ID;
       countOff = 0;
 
-      readEnvironment();
+      readTemperatureHumidity();
       #ifdef THINGSPEAK
       writeSuccess = write2ThingSpeak();
 
@@ -507,7 +525,7 @@ void checkPowerLine()
 
     if (millis() - lastUpdateTime >=  postingInterval) {
       lastUpdateTime = millis();
-      readEnvironment();
+      readTemperatureHumidity();
       #ifdef THINGSPEAK
       writeSuccess = write2ThingSpeak();
       if (writeSuccess != 200) {
@@ -570,6 +588,7 @@ void readKey()
 
   }//close if(time buffer)
 }
+
 
 void exitMaintenance()
 {
@@ -819,7 +838,7 @@ void clearCounting()
 
 void write2ThingSpeakAgain()
 {
-  readEnvironment();
+  readTemperatureHumidity();
   Serial.println("Send data to ThingSpeak again");
   write2ThingSpeak();
   timer.stop(idTimer);
