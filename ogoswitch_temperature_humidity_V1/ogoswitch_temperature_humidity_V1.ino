@@ -54,7 +54,7 @@ SOFTWARE.
 
 #include "ogoswitch.h"
 #include <SPI.h>
-#include <SD.h>
+// #include <SD.h>
 
 #include <ThingSpeak.h>
 #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
@@ -1254,7 +1254,7 @@ void writeEEPROM(char* buff, int offset, int len) {
     EEPROM.commit();
 }
 
-
+/*
 int init_sdcard()
 {
   unsigned long dataSize;
@@ -1306,7 +1306,7 @@ void write_datalogger(String dataString) {
   }
 }
 
-
+*/
 
 void blink()
 {

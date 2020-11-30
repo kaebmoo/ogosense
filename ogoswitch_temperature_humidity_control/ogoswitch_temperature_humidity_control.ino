@@ -37,7 +37,7 @@ SOFTWARE.
 // #define BLYNK_PRINT Serial
 
 // #define SLEEP
-#define MATRIXLED
+// #define MATRIXLED
 // #define SOILMOISTURE
 // #define EXTERNALSENSE
 

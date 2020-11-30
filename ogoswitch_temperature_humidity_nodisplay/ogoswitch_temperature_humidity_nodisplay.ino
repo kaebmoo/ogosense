@@ -42,6 +42,7 @@ SOFTWARE.
 // #define EXTERNALSENSE
 
 // #define BLYNKLOCAL
+#define BLYNK
 #define THINGSPEAK
 // #define
 // #define SECONDRELAY
@@ -53,7 +54,7 @@ SOFTWARE.
 
 #include "ogoswitch.h"
 #include <SPI.h>
-#include <SD.h>
+// #include <SD.h>
 #include <ThingSpeak.h>
 #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
 #include <BlynkSimpleEsp8266.h>
@@ -1148,6 +1149,7 @@ void turnRelayOn()
   digitalWrite(LED_BUILTIN, LOW);  // turn on
   led1.on();
   Blynk.virtualWrite(V0, 1);
+  Blynk.virtualWrite(V1, 1);
   buzzer_sound();
 }
 
@@ -1158,6 +1160,7 @@ void turnRelayOff()
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
   led1.off();
   Blynk.virtualWrite(V0, 0);
+  Blynk.virtualWrite(V1, 0);
   buzzer_sound();
 }
 
@@ -1316,7 +1319,7 @@ void writeEEPROM(char* buff, int offset, int len) {
 }
 
 
-
+/*
 int init_sdcard()
 {
   unsigned long dataSize;
@@ -1348,6 +1351,10 @@ int init_sdcard()
 
 }
 
+*/
+
+
+/*
 void write_datalogger(String dataString) {
 
 
@@ -1368,7 +1375,7 @@ void write_datalogger(String dataString) {
   }
 }
 
-
+*/
 
 void blink()
 {
@@ -1502,9 +1509,11 @@ BLYNK_WRITE(V1)
   if(!AUTO) {
     if (pinValue == 1) {
       Blynk.virtualWrite(V0, 1);
+      Blynk.virtualWrite(V1, 1);
     }
     else {
       Blynk.virtualWrite(V0, 0);
+      Blynk.virtualWrite(V1, 0);
     }
   }
   else {
@@ -1663,6 +1672,18 @@ BLYNK_WRITE(V69)
     delay(5000);
   }
 }
+
+BLYNK_WRITE(V23)
+{
+  int pinValue = param.asInt(); // assigning incoming value from pin V69 to a variable
+
+  if (pinValue == 1) {
+    delay(500);
+    ESP.reset();
+    delay(5000);
+  }
+}
+
 
 BLYNK_WRITE(V24)
 {
