@@ -1,175 +1,258 @@
+---
+
 # OgoSense ESP8266 Firmware
 
-This firmware is designed for ESP8266 microcontrollers to monitor and control environmental conditions using various sensors and actuators. It supports temperature and humidity sensing, relay control, and integration with ThingSpeak and Telegram.
+OgoSense is a versatile firmware designed for ESP8266 microcontrollers to monitor and control environmental conditions. It reads sensor data, controls relays based on configurable thresholds, and integrates with platforms like ThingSpeak and Telegram for data logging and remote control.
+
+> **License:** MIT License  
+> **Version History:**  
+> * Version 1.0 – 2018-01-22  
+> * Version 2.0 – 2025-03-15
+
+---
 
 ## Features
 
-* **Environmental Sensing:** Reads temperature and humidity data from an SHT30 sensor.
-* **Relay Control:** Controls relays based on sensor readings and user-defined settings.
-* **Automation Modes:** Supports different automation modes based on temperature, humidity, or both.
-* **ThingSpeak Integration:** Logs sensor data and relay status to ThingSpeak for data visualization and analysis.
-* **Telegram Integration:** Allows users to monitor device status, control settings, and receive alerts via Telegram Bot.
-* **Configuration Storage:** Stores device configuration (temperature/humidity thresholds, options, etc.) in EEPROM for persistence.
-* **Wi-Fi Management:** Automatically connects to Wi-Fi networks using WiFiManager.
-* **Over-the-Air (OTA) Updates:** (Note: This README doesn't show OTA code, but the project might include it)
+- **Environmental Sensing:**  
+  Reads temperature and humidity data from an SHT30 sensor. Supports optional soil moisture sensing if the sensor is connected.
+
+- **Relay Control:**  
+  Automatically controls one or two relays based on sensor readings and user-defined thresholds. Supports both temperature-only and humidity-only modes, as well as combined control modes.
+
+- **Automation Modes:**  
+  Choose from several modes using an options parameter:  
+  - `0`: Humidity control only  
+  - `1`: Temperature control only  
+  - `2`: Temperature & Humidity control  
+  - `3`: Soil Moisture mode (if a soil moisture sensor is connected)  
+  - `4`: Temperature or Humidity control (with support for a second relay)
+
+- **Platform Integrations:**  
+  - **ThingSpeak Integration:** Logs sensor data and relay status for remote visualization and analysis.  
+  - **Telegram Integration:** Monitor device status, update settings, and control the relay manually (available only in manual mode) via Telegram commands.  
+  - **(Optional) Netpie Integration:** For IoT messaging, if enabled in your configuration.
+
+- **Configuration Persistence:**  
+  Device settings such as temperature/humidity thresholds, operating modes, and API keys are stored in EEPROM to ensure persistence across reboots.
+
+- **Wi-Fi Management:**  
+  Uses WiFiManager to automatically connect to available Wi-Fi networks.
+
+- **Additional Hardware Support:**  
+  Optional support for:  
+  - A second relay for dual control scenarios  
+  - Dot matrix LED display (using the MLEDScroll library)  
+  - A buzzer for audible feedback  
+  - Soil moisture sensors for additional environmental monitoring
+
+---
 
 ## Hardware Requirements
 
-* ESP8266 (e.g., Wemos D1 mini, Pro)
-* Wemos SHT30 Shield (connected to D1, D2 pins)
-* Wemos Relay Shield (connected to D6, D7 pins)
-* (Optional) Dot matrix LED (connected to D5, D7)
-* (Optional) Buzzer (connected to D5)
-* (Optional) Soil Moisture Sensor
+- **Microcontroller:**  
+  ESP8266 (e.g., Wemos D1 mini or Wemos D1 mini Pro)
+
+- **Sensors & Shields:**  
+  - Wemos SHT30 Shield (connects to D1 and D2 pins)  
+  - Wemos Relay Shield (connects to D6 and D7 pins)  
+  - *(Optional)* Soil Moisture Sensor (if using soil moisture mode)
+
+- **Additional Peripherals (Optional):**  
+  - Dot Matrix LED (e.g., for scrolling messages; requires additional pin connections)  
+  - Buzzer (connected to D5 for audio alerts)
+
+---
 
 ## Software Requirements
 
-* Arduino IDE
-* ESP8266 Board Support Package
-* Required Libraries (install via Arduino Library Manager):
-    * WiFiManager
-    * ThingSpeak
-    * ESP8266HTTPClient
-    * ArduinoJson
-    * UniversalTelegramBot
-    * WiFiClientSecure
-    * Wire
-    * WEMOS\_SHT3X
-    * SPI
-    * Timer
-    * MLEDScroll (if using Matrix LED)
+- **Development Environment:**  
+  Arduino IDE with ESP8266 Board Support Package
+
+- **Required Libraries (install via Arduino Library Manager):**  
+  - WiFiManager  
+  - ThingSpeak  
+  - ESP8266HTTPClient  
+  - ArduinoJson  
+  - UniversalTelegramBot  
+  - WiFiClientSecure  
+  - Wire  
+  - WEMOS_SHT3X  
+  - SPI  
+  - EEPROM  
+  - Timer  
+  - *(Optional)* MLEDScroll (if using a matrix LED)  
+  - *(Optional)* MicroGear (if using Netpie integration)
+
+---
 
 ## Installation
 
-1.  Download the project source code.
-2.  In the Arduino IDE, install the required libraries using the Library Manager.
-3.  Install the ESP8266 Board Support Package if you haven't already.
-4.  Open the project in the Arduino IDE.
-5.  Configure the settings in the `ogosense.h` file (see Configuration section below).
-6.  Connect your ESP8266 to your computer.
-7.  Select the correct board and port in the Arduino IDE.
-8.  Upload the code to your ESP8266.
+1. **Download the Source Code:**  
+   Clone or download the OgoSense firmware repository.
 
-## Configuration
+2. **Install Required Libraries:**  
+   Use the Arduino Library Manager to install all required libraries listed above.
 
-The firmware's behavior is configured through the `ogosense.h` header file. You'll need to adjust the following settings:
+3. **Configure the Firmware:**  
+   Open the `ogosense.h` file (or configuration section within the code) and update the following settings as needed:
+   - **Platform Integration:**  
+     - ThingSpeak: Update `channelID`, `readAPIKey`, and `writeAPIKey` with your credentials.  
+     - Telegram Bot: Set your `telegramToken`, `TELEGRAM_CHAT_ID`, and allowed chat IDs.  
+     - *(Optional)* Netpie: Provide your APPID, KEY, SECRET, and topic details.
+   - **Device Settings:**  
+     - Set a unique `DEVICE_ID`.  
+     - Define an `INFO_SECRET` used for secure device information requests.
+   - **Sensor & Control Parameters:**  
+     - Adjust temperature (`HIGH_TEMPERATURE` and `LOW_TEMPERATURE`) and humidity (`HIGH_HUMIDITY` and `LOW_HUMIDITY`) thresholds.  
+     - Set the default `OPTIONS`, `COOL_MODE`, and `MOISTURE_MODE` for your control strategy.
 
-###   Platform Integration
+4. **Connect Your ESP8266:**  
+   Use a USB cable to connect the ESP8266 board to your computer.
 
-* **ThingSpeak:**
-    ```c++
-    #ifdef THINGSPEAK
-      // ThingSpeak information
-      const char thingSpeakAddress= "api.thingspeak.com";
-      unsigned long channelID = 0000000;  // Replace with your Channel ID
-      char readAPIKey= "YOUR_READ_API_KEY";   // Replace with your Read API Key
-      char writeAPIKey= "YOUR_WRITE_API_KEY";  // Replace with your Write API Key
-    #endif
-    ```
-    * `channelID`: The ID of your ThingSpeak channel.
-    * `readAPIKey`: The Read API Key for your ThingSpeak channel.
-    * `writeAPIKey`: The Write API Key for your ThingSpeak channel.
+5. **Select Board & Port:**  
+   In the Arduino IDE, choose the correct board type and serial port.
 
-* **Telegram Bot:**
-    ```c++
-    const char* telegramToken = "YOUR_TELEGRAM_BOT_TOKEN"; // Replace with your Bot Token
-    #define TELEGRAM_CHAT_ID "YOUR_CHAT_ID"  // Replace with your Chat ID
-    const char* allowedChatIDs= {"YOUR_CHAT_ID_1", "YOUR_CHAT_ID_2"}; // Replace with allowed Chat IDs
-    const int numAllowedChatIDs = sizeof(allowedChatIDs) / sizeof(allowedChatIDs[0]);
-    ```
-    * `telegramToken`: The API token for your Telegram Bot.
-    * `TELEGRAM_CHAT_ID`: The chat ID of the user or group to receive messages.
-    * `allowedChatIDs`: An array of chat IDs that are allowed to interact with the bot.
+6. **Upload the Code:**  
+   Compile and upload the firmware to your ESP8266.
 
-* **Netpie:**
-    ```c++
-    #ifdef NETPIE
-      #define APPID   "YOUR_APP_ID"                  // application id from netpie
-      #define KEY     "YOUR_NETPIE_KEY"           // key from netpie
-      #define SECRET  "YOUR_NETPIE_SECRET" // secret from netpie
+---
 
-      String ALIAS = "ogosense-device";              // alias name netpie
-      char *me = "/ogosense/data";                  // topic set for sensor box
-      char *relayStatus1 = "/ogosense/relay/1";     // topic status "1" or "0", "ON" or "OFF"
-      char *relayStatus2 = "/ogosense/relay/2";     // topic status "1" or "0", "ON" or "OFF"
+## Configuration Details
 
-      MicroGear microgear(client);
-    #endif
-    ```
-    * `APPID`, `KEY`, `SECRET`: Obtain these from your Netpie account.
-    * `ALIAS`: A unique alias for your device on Netpie.
-    * `me`, `relayStatus1`, `relayStatus2`: Define the topics used for communication with Netpie.
+### Platform Integration
 
-###   Device Settings
+- **ThingSpeak:**  
+  ```cpp
+  #ifdef THINGSPEAK
+    const char thingSpeakAddress[] = "api.thingspeak.com";
+    unsigned long channelID = 0000000;  // Replace with your ThingSpeak Channel ID
+    char readAPIKey[]  = "YOUR_READ_API_KEY";   // Replace with your Read API Key
+    char writeAPIKey[] = "YOUR_WRITE_API_KEY";  // Replace with your Write API Key
+  #endif
+  ```
 
-* **Device ID and Secret:**
-    ```c++
-    const int DEVICE_ID = 12345;  // Replace with a unique Device ID
-    const char* INFO_SECRET = "your_secret_code"; // Replace with your secret code
-    ```
-    * `DEVICE_ID`: A unique identifier for your device.
-    * `INFO_SECRET`: A secret code used for authentication when accessing device information.
+- **Telegram Bot:**  
+  ```cpp
+  const char* telegramToken = "YOUR_TELEGRAM_BOT_TOKEN";  // Replace with your Bot Token
+  #define TELEGRAM_CHAT_ID "YOUR_CHAT_ID"                  // Replace with your Chat ID
+  const char* allowedChatIDs[] = {"YOUR_CHAT_ID_1", "YOUR_CHAT_ID_2"}; // Allowed chat IDs array
+  const int numAllowedChatIDs = sizeof(allowedChatIDs) / sizeof(allowedChatIDs[0]);
+  ```
 
-###   Sensor and Control Parameters
+- **Netpie (Optional):**  
+  ```cpp
+  #ifdef NETPIE
+    #define APPID   "YOUR_APP_ID"             // Netpie application ID
+    #define KEY     "YOUR_NETPIE_KEY"           // Netpie key
+    #define SECRET  "YOUR_NETPIE_SECRET"        // Netpie secret
 
-* **Temperature and Humidity Thresholds:**
-    ```c++
-    #define HIGH_TEMPERATURE 30.0    // Replace with your high temperature threshold
-    #define LOW_TEMPERATURE 25.0     // Replace with your low temperature threshold
-    #define HIGH_HUMIDITY 60         // Replace with your high humidity threshold
-    #define LOW_HUMIDITY 55          // Replace with your low humidity threshold
-    ```
-    * `HIGH_TEMPERATURE`: Temperature above which the relay may turn on (depending on mode).
-    * `LOW_TEMPERATURE`: Temperature below which the relay may turn on (depending on mode).
-    * `HIGH_HUMIDITY`: Humidity above which the relay may turn on (depending on mode).
-    * `LOW_HUMIDITY`: Humidity below which the relay may turn on (depending on mode).
+    String ALIAS = "ogosense-device";           // Device alias on Netpie
+    char *me = "/ogosense/data";                // Topic for sensor data
+    char *relayStatus1 = "/ogosense/relay/1";   // Topic for Relay #1 status
+    char *relayStatus2 = "/ogosense/relay/2";   // Topic for Relay #2 status
 
-* **Control Options:**
-    ```c++
-    #define OPTIONS 1        // Replace with your default option
-    #define COOL_MODE 1      // Replace with your default COOL mode
-    #define MOISTURE_MODE 0  // Replace with your default MOISTURE mode
-    ```
-    * `OPTIONS`:
-        * `0`: Humidity control only
-        * `1`: Temperature control only
-        * `2`: Temperature and humidity control
-        * `3`: Soil moisture control (if soil moisture sensor is connected)
-        * `4`: Temperature or Humidity (Second Relay Control)
-    * `COOL_MODE`:
-        * `1`: COOL mode (Relay turns ON when temperature is HIGH)
-        * `0`: HEAT mode (Relay turns ON when temperature is LOW)
-    * `MOISTURE_MODE`:
-        * `1`: Moisture mode (Relay turns ON when humidity is LOW)
-        * `0`: Dehumidifier mode (Relay turns ON when humidity is HIGH)
+    MicroGear microgear(client);
+  #endif
+  ```
 
-###   Relay Pin Definitions
+### Device Settings
 
-* ```c++
-    #if defined(SECONDRELAY) && !defined(MATRIXLED)
-      const int RELAY1 = D7;
-      const int RELAY2 = D6;
-    #else
-      const int RELAY1 = D7;
-    #endif
-    ```
+- **Device Identification:**  
+  ```cpp
+  const int DEVICE_ID = 12345;  // Set a unique Device ID for each device
+  const char* INFO_SECRET = "your_secret_code";  // Secret code for secure info requests
+  ```
+
+### Sensor and Control Parameters
+
+- **Temperature & Humidity Thresholds:**  
+  ```cpp
+  #define HIGH_TEMPERATURE 30.0  // High temperature threshold (°C)
+  #define LOW_TEMPERATURE 25.0   // Low temperature threshold (°C)
+  #define HIGH_HUMIDITY 60       // High humidity threshold (%)
+  #define LOW_HUMIDITY 55        // Low humidity threshold (%)
+  ```
+
+- **Control Options:**  
+  ```cpp
+  #define OPTIONS 1        // Default control option (0 to 4)
+  #define COOL_MODE 1      // 1: COOL mode (Relay ON when temperature is high), 0: HEAT mode (Relay ON when temperature is low)
+  #define MOISTURE_MODE 0  // 1: Moisture mode (Relay ON when humidity is low), 0: Dehumidifier mode (Relay ON when humidity is high)
+  ```
+  *Modes available (OPTIONS):*  
+  - `0`: Humidity control only  
+  - `1`: Temperature control only  
+  - `2`: Combined Temperature & Humidity control  
+  - `3`: Soil Moisture mode (requires soil moisture sensor)  
+  - `4`: Temperature or Humidity control (with optional second relay support)
+
+### Relay Pin Definitions
+
+- **Relay Setup:**  
+  ```cpp
+  #if defined(SECONDRELAY) && !defined(MATRIXLED)
+    const int RELAY1 = D7;
+    const int RELAY2 = D6;
+  #else
+    const int RELAY1 = D7;
+  #endif
+  ```
+  If you have a second relay connected, define `SECONDRELAY` in your configuration.
+
+---
 
 ## Usage
 
-1.  After uploading the code and configuring the settings, the ESP8266 will connect to Wi-Fi.
-2.  The device will start reading sensor data and controlling the relay(s) based on the configured options and thresholds.
-3.  Sensor data and relay status will be sent to ThingSpeak (if enabled).
-4.  You can interact with the device via Telegram Bot (if enabled) using the following commands:
-    * `/start`:  Displays a welcome message.
-    * `/status <device_id>`: Displays the device's status (temperature, humidity, relay status).
-    * `/settemp <device_id> <lowTemp> <highTemp>`: Sets the temperature thresholds.
-    * `/sethum <device_id> <lowHumidity> <highHumidity>`: Sets the humidity thresholds.
-    * `/info <device_id> <secret>`: Displays device configuration information (requires the correct `INFO_SECRET`).
+1. **Power On & Wi-Fi Connection:**  
+   After uploading, the firmware will automatically connect to Wi-Fi using WiFiManager.
+
+2. **Sensor Monitoring & Relay Control:**  
+   The ESP8266 continuously reads temperature, humidity (and optionally soil moisture) data from the SHT30 sensor. Based on the set thresholds and mode:
+   - In **Auto mode**, the relay(s) are controlled automatically.
+   - In **Manual mode**, you can send commands via Telegram to control the relay(s).
+
+3. **Data Logging:**  
+   Sensor readings and relay statuses are sent to ThingSpeak (if enabled) for remote monitoring.
+
+4. **Remote Control via Telegram:**  
+   Use the following commands (ensure you use the correct `DEVICE_ID`):
+   - `/start`  
+     Displays a welcome message.
+   - `/status <device_id>`  
+     Returns current temperature, humidity, and relay status.
+   - `/settemp <device_id> <lowTemp> <highTemp>`  
+     Update the temperature thresholds.
+   - `/sethum <device_id> <lowHumidity> <highHumidity>`  
+     Update the humidity thresholds.
+   - `/setmode <device_id> <auto|manual>`  
+     Switch between automatic and manual relay control.
+   - `/setoption <device_id> <option>`  
+     Change the control option (0–4).
+   - `/info <device_id> <secret>`  
+     Returns detailed device configuration (authentication required).
+   - `/relay <device_id> <state>`  
+     Manually control the relay (only works in manual mode; state should be 1 for ON or 0 for OFF).
+
+---
 
 ## Important Notes
 
-* Replace all placeholder values in the configuration sections with your actual credentials and settings.
-* Ensure that your hardware connections are correct, especially for the SHT30 and Relay Shields.
-* This firmware provides a basic framework. You may need to modify or extend it to meet your specific requirements.
-* Handle API keys and sensitive information securely. Avoid storing them directly in your code if possible, and consider using environment variables or configuration files.
-* Refer to the documentation and examples of the libraries used in this project for more details on their usage.
+- **Configuration:**  
+  Ensure you update all placeholder values (API keys, channel IDs, device IDs, etc.) in the configuration section before deployment.
+
+- **Hardware Connections:**  
+  Verify that all sensors and shields (SHT30, Relay, optional modules) are connected to the correct pins as specified in the source code.
+
+- **Security:**  
+  Handle API keys, tokens, and sensitive information securely. Consider using external configuration methods or environment variables for production systems.
+
+- **Extensibility:**  
+  OgoSense provides a flexible framework that can be extended. Modify the source as needed to add features or support additional sensors and peripherals.
+
+---
+
+By following these instructions, you can set up and deploy OgoSense on your ESP8266, enabling robust environmental monitoring and control with remote access via ThingSpeak and Telegram.
+
+Happy coding!
+
+---

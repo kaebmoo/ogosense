@@ -59,6 +59,7 @@ SOFTWARE.
   #include <WiFi.h>
 #else
   #include <ESP8266WiFi.h>         // สำหรับ ESP8266 (Wemos D1 mini pro)
+  #include <ESP8266WebServer.h>
 #endif
 #include <WiFiManager.h>         // WiFiManager เวอร์ชัน 2.0.17
 #include <ThingSpeak.h>
@@ -71,11 +72,17 @@ SOFTWARE.
 #include <SPI.h>
 #include <EEPROM.h>
 #include <Timer.h>  //https://github.com/JChristensen/Timer
+// #include <ElegantOTA.h>
+
 #include "ogosense.h"
 
 #ifdef ESP8266
   X509List cert(TELEGRAM_CERTIFICATE_ROOT);
 #endif
+
+WiFiClient client;  // ใช้กับ thinkspeak
+WiFiClientSecure clientSecure; // ใช้กับ telegram
+UniversalTelegramBot bot(telegramToken, clientSecure);
 
 char auth[] = "XXXXXXXXXXed4061bb4e0dXXXXXXXXXX";
 
@@ -130,14 +137,10 @@ bool humion = false;     // flag ON/OFF
 
 SHT3X sht30(0x45);  // address sensor use D1, D2 pin
 
-WiFiClient client;
-
-WiFiClientSecure clientSecure;
-UniversalTelegramBot bot(telegramToken, clientSecure);
-
 const long interval = 1000;
 int ledState = LOW;
 unsigned long previousMillis = 0;
+unsigned long ota_progress_millis = 0;
 const unsigned long onPeriod = 60L * 60L * 1000L;       // ON relay period minute * second * milli second
 const unsigned long standbyPeriod = 300L * 1000L;       // delay start timer for relay
 
@@ -219,7 +222,6 @@ void loop() {
   t_delayStart2.update();
 
   t_readSensor.update();
-
   t_sendDatatoThinkSpeak.update();
 
 }
@@ -429,6 +431,8 @@ void handleNewMessages(int numNewMessages)
         } else {
           String infoMsg = "----- Device Info -----\n";
           infoMsg += "Device ID: " + String(DEVICE_ID) + "\n";
+          infoMsg += "IP Address: " + WiFi.localIP().toString() + "\n";
+          infoMsg += "MAC Address: " + WiFi.macAddress() + "\n";
           infoMsg += "Temperature Set Points: Low = " + String(lowTemp) + "°C, High = " + String(highTemp) + "°C\n";
           infoMsg += "Humidity Set Points: Low = " + String(lowHumidity) + "%, High = " + String(highHumidity) + "%\n";
           infoMsg += "Mode: " + String(AUTO ? "AUTO" : "Manual") + "\n";
@@ -1079,4 +1083,3 @@ void blink()
     digitalWrite(LED, ledState);
   }
 }
-
