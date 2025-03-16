@@ -123,9 +123,8 @@ bool AUTO = true;        // AUTO or Manual Mode ON/OFF relay, AUTO is depend on 
 int options = OPTIONS; // 1 ค่า default (สามารถเปลี่ยนผ่านคำสั่ง /setmode) // options : 0 = humidity only, 1 = temperature only, 2 = temperature & humidity
 
 // โหมดสำหรับ temperature และ humidity
-int COOL = COOL_MODE;    // 1 ค่า default // COOL: 1 = COOL mode (relay ON เมื่ออุณหภูมิสูงเกิน highTemp), 0 = HEAT mode (relay OFF เมื่ออุณหภูมิต่ำกว่า lowTemp)
-int MOISTURE = MOISTURE_MODE; // 0 ค่า default // MOISTURE: 1 = moisture mode (relay ON เมื่อความชื้นต่ำกว่า lowHum), 0 = dehumidifier mode (relay OFF เมื่อความชื้นสูงกว่า highHum)
-
+int COOL = COOL_MODE;    // 1 ค่า default // COOL: 1 = COOL mode , 0 = HEAT mode 
+int MOISTURE = MOISTURE_MODE; // 0 ค่า default // MOISTURE: 1 = moisture mode, 0 = dehumidifier mode 
 bool tempon = false;     // flag ON/OFF
 bool humion = false;     // flag ON/OFF
 
@@ -257,6 +256,7 @@ void handleNewMessages(int numNewMessages)
     // Print the received message
     String text = bot.messages[i].text;
     Serial.println(text);
+
     String from_name = bot.messages[i].from_name;
 
     if (text == "/start") {
@@ -273,7 +273,7 @@ void handleNewMessages(int numNewMessages)
       bot.sendMessage(chat_id, statusMsg);
     }
     */
-    if (text.startsWith("/status")) {
+    else if (text.startsWith("/status")) {
       int spaceIndex = text.indexOf(' ');
       if (spaceIndex == -1) {
         bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /status <id>");
@@ -291,8 +291,123 @@ void handleNewMessages(int numNewMessages)
         }
       }
     }
+        // /settemp <device_id> <lowTemp> <highTemp>
+    else if (text.startsWith("/settemp")) {
+      int firstSpace = text.indexOf(' ');
+      if (firstSpace == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /settemp <id> <lowTemp> <highTemp>");
+        continue;
+      }
+      String params = text.substring(firstSpace + 1);
+      int space1 = params.indexOf(' ');
+      int space2 = params.indexOf(' ', space1 + 1);
+      if (space1 == -1 || space2 == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /settemp <id> <lowTemp> <highTemp>");
+        continue;
+      }
+      int cmdID = params.substring(0, space1).toInt();
+      if (cmdID != DEVICE_ID) {
+        Serial.println("คำสั่ง /settemp ไม่ตรงกับ DEVICE_ID " + String(DEVICE_ID));
+        continue;
+      }
+      float lt = params.substring(space1 + 1, space2).toFloat();
+      float ht = params.substring(space2 + 1).toFloat();
+      lowTemp = lt;
+      highTemp = ht;
+      saveConfig();
+      bot.sendMessage(chat_id, "ตั้งค่า Temperature สำเร็จ: Low=" + String(lowTemp) +
+                      "°C, High=" + String(highTemp) + "°C");
+    }
+    // /sethum <device_id> <lowHumidity> <highHumidity>
+    else if (text.startsWith("/sethum")) {
+      int firstSpace = text.indexOf(' ');
+      if (firstSpace == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /sethum <id> <lowHumidity> <highHumidity>");
+        continue;
+      }
+      String params = text.substring(firstSpace + 1);
+      int space1 = params.indexOf(' ');
+      int space2 = params.indexOf(' ', space1 + 1);
+      if (space1 == -1 || space2 == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /sethum <id> <lowHumidity> <highHumidity>");
+        continue;
+      }
+      int cmdID = params.substring(0, space1).toInt();
+      if (cmdID != DEVICE_ID) {
+        Serial.println("คำสั่ง /sethum ไม่ตรงกับ DEVICE_ID " + String(DEVICE_ID));
+        continue;
+      }
+      float lh = params.substring(space1 + 1, space2).toFloat();
+      float hh = params.substring(space2 + 1).toFloat();
+      lowHumidity = lh;
+      highHumidity = hh;
+      saveConfig();
+      bot.sendMessage(chat_id, "ตั้งค่า Humidity สำเร็จ: Low=" + String(lowHumidity) +
+                      "%, High=" + String(highHumidity) + "%");
+    }
+    else if (text.startsWith("/info")) {
+      int firstSpace = text.indexOf(' ');
+      if (firstSpace == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /info <id> <secret>");
+      } else {
+        // แยก device_id และ secret code
+        String params = text.substring(firstSpace + 1);
+        int spaceIndex = params.indexOf(' ');
+        if (spaceIndex == -1) {
+          bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /info <id> <secret>");
+          continue;
+        }
+        int cmdID = params.substring(0, spaceIndex).toInt();
+        String secret = params.substring(spaceIndex + 1);
+        secret.trim();
+        if (cmdID != DEVICE_ID) {
+          bot.sendMessage(chat_id, "Device ID ไม่ตรงกับเครื่องนี้", "");
+        } else if (!secret.equals(INFO_SECRET)) {
+          bot.sendMessage(chat_id, "Secret code ไม่ถูกต้อง", "");
+        } else {
+          String infoMsg = "----- Device Info -----\n";
+          infoMsg += "Device ID: " + String(DEVICE_ID) + "\n";
+          infoMsg += "Temperature Set Points: Low = " + String(lowTemp) + "°C, High = " + String(highTemp) + "°C\n";
+          infoMsg += "Humidity Set Points: Low = " + String(lowHumidity) + "%, High = " + String(highHumidity) + "%\n";
+          
+          String optionStr;
+          switch(options) {
+            case 0: optionStr = "0 (Humidity only)"; break;
+            case 1: optionStr = "1 (Temperature only)"; break;
+            case 2: optionStr = "2 (Temperature & Humidity)"; break;
+            case 3: optionStr = "3 (Soil Moisture mode)"; break;
+            case 4: optionStr = "4 (Additional mode)"; break;
+            default: optionStr = String(options) + " (Unknown)";
+          }
+          infoMsg += "Option: " + optionStr + "\n";
+          
+          String coolStr = (COOL == 1) ? "1 (COOL mode: Relay ON เมื่อ Temp >= High)" : "0 (HEAT mode: Relay ON เมื่อ Temp <= Low)";
+          infoMsg += "COOL: " + coolStr + "\n";
+          
+          String moistureStr = (MOISTURE == 1) ? "1 (Moisture mode: Relay ON เมื่อ Humidity <= Low)" : "0 (Dehumidifier mode: Relay ON เมื่อ Humidity >= High)";
+          infoMsg += "MOISTURE: " + moistureStr + "\n";
+          
+          infoMsg += "Write API Key: " + String(writeAPIKey) + "\n";
+          infoMsg += "Read API Key: " + String(readAPIKey) + "\n";
+          infoMsg += "Channel ID: " + String(channelID) + "\n";
+          
+          infoMsg += "Allowed Chat IDs: ";
+          for (int j = 0; j < numAllowedChatIDs; j++) {
+            infoMsg += String(allowedChatIDs[j]);
+            if (j < numAllowedChatIDs - 1)
+              infoMsg += ", ";
+          }
+          infoMsg += "\n-----------------------";
+          
+          bot.sendMessage(chat_id, infoMsg);
+        }
+      }
+    }
+    else {
+      bot.sendMessage(chat_id, "คำสั่งไม่รู้จัก", "");
+    }
 
-  }
+  } // for loop message
 
 }
 
@@ -426,7 +541,7 @@ void controlRelay()
    *  read data from temperature & humidity sensor
    *  set action by options
    *  options:
-   *  4 = temperature, humidity
+   *  4 = temperature or humidity (temperature relay2)
    *  3 = soil moisture
    *  2 = temperature & humidity
    *  1 = temperature
@@ -444,43 +559,45 @@ void controlRelay()
 
     if(sensorStatus == 0) {
       // Moisture mode
-      
+      // กำหนด flag เพื่อให้ relay เปิด หรือ ปิด 
       if (MOISTURE == 1) {  // ความชื้นต่ำให้เปิด relay
-        if (humidity_sensor_value <= lowHumidity) {
+        if (humidity_sensor_value < lowHumidity) {
           humion = true;
         }
-        else if (humidity_sensor_value >= highHumidity) { // ความชื้นสูงให้ปิด relay
+        else if (humidity_sensor_value > highHumidity) { // ความชื้นสูงให้ปิด relay
           humion = false;
         }
       }
       // Dehumidifier mode
-      else if (MOISTURE == 0){ // ความชื้นสูงให้เปิด relay
-        if (humidity_sensor_value >= highHumidity) {
+      else if (MOISTURE == 0){ // ความชื้นสูงให้เปิด relay หรือให้เปิด heater
+        if (humidity_sensor_value > highHumidity) {
           humion = true;
         }
-        else if (humidity_sensor_value <= lowHumidity) { // ความชื้นต่ำให้ปิด relay 
+        else if (humidity_sensor_value < lowHumidity) { // ความชื้นต่ำให้ปิด relay 
           humion = false;
         }
       }
       // cool mode
       if(COOL == 1) {
-        if (temperature_sensor_value >= highTemp) { // ร้อนให้เปิด relay
+        if (temperature_sensor_value > highTemp) { // ร้อนให้เปิด relay
           tempon = true;
         }
-        else if (temperature_sensor_value <= lowTemp) { // เย็นให้ปิด relay
+        else if (temperature_sensor_value < lowTemp) { // เย็นให้ปิด relay
           tempon = false;
         }
       }
       // heater mode
       else if (COOL == 0){
-        if (temperature_sensor_value <= lowTemp) {  // เย็นให้เปิด relay or heater
+        if (temperature_sensor_value < lowTemp) {  // เย็นให้เปิด relay or heater
           tempon = true;
         }
-        else if (temperature_sensor_value >= highTemp) { // ร้อนให้ปิด relay or heater
+        else if (temperature_sensor_value > highTemp) { // ร้อนให้ปิด relay or heater
           tempon = false;
         }
       }
+      // จบเงื่อนไข
 
+      // ตรวจสอบ option เพื่อทำงานตามอุณหภูมิ หรือ ความชื้น หรือทั้งสองอย่าง 
       if (options == 2) { // ทำงานสองเงื่อนไขพร้อมกัน 
         Serial.println("Option: Temperature & Humidity");
         if (tempon == true && humion == true) {
@@ -681,6 +798,24 @@ void printConfig()
   Serial.println(channelID);
 }
 
+void saveConfig()
+{
+  EEPROM.begin(512);
+  EEPROMWritelong(0, (long) highHumidity);
+  EEPROMWritelong(4, (long) lowHumidity);
+  EEPROMWritelong(8, (long) highTemp);
+  EEPROMWritelong(12, (long) lowTemp);
+  eeWriteInt(16, options);
+  eeWriteInt(20, COOL);
+  eeWriteInt(24, MOISTURE);
+  writeEEPROM(writeAPIKey, 28, 16);
+  writeEEPROM(readAPIKey, 44, 16);
+  writeEEPROM(auth, 60, 32);
+  EEPROMWritelong(92, (long) channelID);
+  eeWriteInt(500, 6550);
+  EEPROM.end();
+}
+
 void getConfig()
 {
   // read config from eeprom
@@ -696,6 +831,7 @@ void getConfig()
   readEEPROM(readAPIKey, 44, 16);
   readEEPROM(auth, 60, 32);
   channelID = (unsigned long) EEPROMReadlong(92);
+  EEPROM.end();
 }
 
 void autoWifiConnect()
