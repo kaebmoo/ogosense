@@ -260,7 +260,7 @@ void handleNewMessages(int numNewMessages)
     String from_name = bot.messages[i].from_name;
 
     if (text == "/start") {
-      String welcome = "Welcome, " + from_name + ".\n";
+      String welcome = "Welcome to OgoSense!, " + from_name + ".\n";
 
       bot.sendMessage(chat_id, welcome, "");
     }
@@ -345,6 +345,68 @@ void handleNewMessages(int numNewMessages)
       bot.sendMessage(chat_id, "ตั้งค่า Humidity สำเร็จ: Low=" + String(lowHumidity) +
                       "%, High=" + String(highHumidity) + "%");
     }
+    // คำสั่ง /setmode <device_id> <mode>
+    // mode รับเป็น "auto" หรือ "manual"
+    else if (text.startsWith("/setmode")) {
+      int firstSpace = text.indexOf(' ');
+      if (firstSpace == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /setmode <id> <mode>");
+        continue;
+      }
+      String params = text.substring(firstSpace + 1);
+      int spaceIndex = params.indexOf(' ');
+      if (spaceIndex == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /setmode <id> <mode>");
+        continue;
+      }
+      int cmdID = params.substring(0, spaceIndex).toInt();
+      if (cmdID != DEVICE_ID) {
+        Serial.println("คำสั่ง /setmode ไม่ตรงกับ DEVICE_ID " + String(DEVICE_ID));
+        continue;
+      }
+      String modeStr = params.substring(spaceIndex + 1);
+      modeStr.trim();
+      if (modeStr.equalsIgnoreCase("auto")) {
+        // สมมุติว่า mode auto คือ 1
+        // deviceMode หรือ AUTO flag
+        AUTO = true;
+      } else if (modeStr.equalsIgnoreCase("manual")) {
+        AUTO = false;
+      } else {
+        bot.sendMessage(chat_id, "Mode ไม่ถูกต้อง (ควรเป็น auto หรือ manual)", "");
+        continue;
+      }
+      saveConfig();
+      bot.sendMessage(chat_id, "ตั้งค่า Mode สำเร็จ: " + String(AUTO ? "Auto" : "Manual"));
+    }
+    // คำสั่ง /setoption <device_id> <option>
+    // option ควรอยู่ในช่วง 0-4
+    else if (text.startsWith("/setoption")) {
+      int firstSpace = text.indexOf(' ');
+      if (firstSpace == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /setoption <id> <option>");
+        continue;
+      }
+      String params = text.substring(firstSpace + 1);
+      int spaceIndex = params.indexOf(' ');
+      if (spaceIndex == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /setoption <id> <option>");
+        continue;
+      }
+      int cmdID = params.substring(0, spaceIndex).toInt();
+      if (cmdID != DEVICE_ID) {
+        Serial.println("คำสั่ง /setoption ไม่ตรงกับ DEVICE_ID " + String(DEVICE_ID));
+        continue;
+      }
+      int opt = params.substring(spaceIndex + 1).toInt();
+      if (opt < 0 || opt > 4) {
+        bot.sendMessage(chat_id, "Option ต้องอยู่ในช่วง 0-4", "");
+        continue;
+      }
+      options = opt;
+      saveConfig();
+      bot.sendMessage(chat_id, "ตั้งค่า Option สำเร็จ: Option=" + String(options));
+    }
     else if (text.startsWith("/info")) {
       int firstSpace = text.indexOf(' ');
       if (firstSpace == -1) {
@@ -369,6 +431,7 @@ void handleNewMessages(int numNewMessages)
           infoMsg += "Device ID: " + String(DEVICE_ID) + "\n";
           infoMsg += "Temperature Set Points: Low = " + String(lowTemp) + "°C, High = " + String(highTemp) + "°C\n";
           infoMsg += "Humidity Set Points: Low = " + String(lowHumidity) + "%, High = " + String(highHumidity) + "%\n";
+          infoMsg += "Mode: " + String(AUTO ? "AUTO" : "Manual") + "\n";
           
           String optionStr;
           switch(options) {
@@ -403,6 +466,51 @@ void handleNewMessages(int numNewMessages)
         }
       }
     }
+    else if (text.startsWith("/relay")) {
+      int firstSpace = text.indexOf(' ');
+      if (firstSpace == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /relay <id> <state>");
+        continue;
+      }
+      String params = text.substring(firstSpace + 1);
+      int spaceIndex = params.indexOf(' ');
+      if (spaceIndex == -1) {
+        bot.sendMessage(chat_id, "รูปแบบคำสั่งไม่ถูกต้อง: /relay <id> <state>");
+        continue;
+      }
+      int cmdID = params.substring(0, spaceIndex).toInt();
+      if (cmdID != DEVICE_ID) {
+        bot.sendMessage(chat_id, "Device ID ไม่ตรงกับเครื่องนี้", "");
+        continue;
+      }
+      int state = params.substring(spaceIndex + 1).toInt();
+      
+      // คำสั่งนี้ใช้ได้เฉพาะใน Manual mode เท่านั้น
+      if (AUTO) {
+        bot.sendMessage(chat_id, "เครื่องอยู่ใน Auto mode ไม่สามารถสั่ง Relay ด้วยคำสั่งนี้", "");
+      } else {
+        if (state == 1) {
+          turnRelayOn();
+          RelayEvent = true;
+          bot.sendMessage(chat_id, "Relay ถูกเปิดแล้ว", "");
+        } else if (state == 0) {
+          turnRelayOff();
+          if (afterStart != -1) {
+            t_relay.stop(afterStart);
+          }
+          if (afterStop != -1) {
+            t_delayStart.stop(afterStop);
+          }
+          RelayEvent = false;
+          afterStart = -1;
+          afterStop = -1;
+          bot.sendMessage(chat_id, "Relay ถูกปิดแล้ว", "");
+        } else {
+          bot.sendMessage(chat_id, "ค่าของ state ต้องเป็น 1 (เปิด) หรือ 0 (ปิด)", "");
+        }
+      }
+    }
+
     else {
       bot.sendMessage(chat_id, "คำสั่งไม่รู้จัก", "");
     }
@@ -744,6 +852,9 @@ void controlRelay()
 
     } // if sensorStatus
   } // if AUTO 
+  else {
+    Serial.println("Manual Mode Active");
+  }
 
 
 }
