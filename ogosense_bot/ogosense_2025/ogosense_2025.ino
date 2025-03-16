@@ -532,6 +532,7 @@ void getTelegramMessage()
     handleNewMessages(numNewMessages);
     numNewMessages = bot.getUpdates(bot.last_message_received + 1);
   }
+  // https://randomnerdtutorials.com/telegram-control-esp32-esp8266-nodemcu-outputs/
 }
 
 #ifdef THINGSPEAK
