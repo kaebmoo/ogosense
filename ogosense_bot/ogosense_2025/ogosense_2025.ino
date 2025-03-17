@@ -47,14 +47,6 @@ SOFTWARE.
   #define soilMoistureLevel 50
 #endif
 
-
-#define BLYNK_GREEN     "#23C48E"
-#define BLYNK_BLUE      "#04C0F8"
-#define BLYNK_YELLOW    "#ED9D00"
-#define BLYNK_RED       "#D3435C"
-#define BLYNK_DARK_BLUE "#5F7CD8"
-
-
 #ifdef ESP32
   #include <WiFi.h>
 #else
@@ -72,6 +64,7 @@ SOFTWARE.
 #include <SPI.h>
 #include <EEPROM.h>
 #include <Timer.h>  //https://github.com/JChristensen/Timer
+#include <Ticker.h>  //Ticker Library
 // #include <ElegantOTA.h>
 
 #include "ogosense.h"
@@ -144,14 +137,38 @@ unsigned long ota_progress_millis = 0;
 const unsigned long onPeriod = 60L * 60L * 1000L;       // ON relay period minute * second * milli second
 const unsigned long standbyPeriod = 300L * 1000L;       // delay start timer for relay
 
-Timer t_relay, t_delayStart, t_readSensor, t_checkFirmware;         // timer for ON period and delay start
+Timer t_relay, t_delayStart, t_checkFirmware;         // timer for ON period and delay start
 Timer t_relay2, t_delayStart2;
 Timer t_sendDatatoThinkSpeak;
-Timer t_getTelegramMessage;
+Timer t_blink;           // สร้าง object สำหรับ timer
 
+Ticker blinker;
+Ticker t_getTelegramMessage;
+Ticker t_readSensor;
+
+volatile bool shouldReadSensor = false;
+volatile bool shouldCheckTelegram = false;
 bool RelayEvent = false;
 int afterStart = -1;
 int afterStop = -1;
+/*
+In this firmware:
+
+- **afterStart** is used to store the timer ID for the "on period" of the relay. 
+When the sensor conditions trigger the relay to turn on, 
+the code schedules a timer (using `t_relay.after(onPeriod, turnoff)`) 
+and saves its identifier in `afterStart`. This timer will eventually trigger 
+the `turnoff()` function to turn off the relay after the defined period.
+
+- **afterStop** is used to store the timer ID for the "delay period" after 
+the relay is turned off. Once the relay is turned off (or when sensor conditions change), 
+the code schedules another timer (using `t_delayStart.after(standbyPeriod, delayStart)`) 
+and saves its identifier in `afterStop`. This ensures there is a standby interval during 
+which the relay cannot be turned on immediately again, helping to prevent rapid toggling.
+
+In summary, **afterStart** manages how long the relay stays on, 
+and **afterStop** ensures a delay before the relay can be activated again.
+*/
 
 bool Relay2Event = false;
 int afterStart2 = -1;
@@ -165,12 +182,17 @@ void printConfig();
 void getConfig();
 void handleNewMessages(int numNewMessages);
 void getTelegramMessage();
+void turnRelayOn();
+void turnRelayOff();
+void buzzer_sound();
+void blink();
+
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   #ifdef ESP8266
-    configTime(0, 0, "pool.ntp.org");   // get UTC time via NTP
+    configTime(0, 0, "pool.ntp.org");         // get UTC time via NTP
     clientSecure.setTrustAnchors(&cert);      // Add root certificate for api.telegram.org
   #endif
   delay(10);
@@ -191,29 +213,40 @@ void setup() {
     digitalWrite(RELAY2, LOW);
   #endif
 
-  autoWifiConnect();
+  // t_blink.every(1000, blink); // 1 second   // กระพริบ LED ทุก 1 วินาที
+  blinker.attach(1, blink); //Use attach_ms if you need time in ms
 
-  getConfig();
-  printConfig();
-  readSensorData();
-  buzzer_sound();
+  autoWifiConnect();  // ต่อ WiFi โดยใช้ WiFiManager
+
+  getConfig();        // อ่านค่า config จาก EEPROM
+  printConfig();      // แสดงค่า config ที่อ่านได้
+  readSensorData();   // อ่านค่า sensor และแสดงผลลัพธ์
+  buzzer_sound();     // เสียง buzzer
 
   #ifdef THINGSPEAK
     ThingSpeak.begin(client);
   #endif
-
-  t_readSensor.every(5000, controlRelay); 
-  t_sendDatatoThinkSpeak.every(60L * 1000L, sendDataToThingSpeak);
-  t_getTelegramMessage.every(1000L, getTelegramMessage);
-
+  
+  t_readSensor.attach(5, setReadSensorFlag);  // 5 seconds  // อ่านค่า sensor ทุก 5 วินาที
+  t_getTelegramMessage.attach(1, checkTelegramFlag);  // อ่านข้อความจาก Telegram ทุก 1 วินาที
+  t_sendDatatoThinkSpeak.every(60L * 1000L, sendDataToThingSpeak);  // ส่งข้อมูลไป ThingSpeak ทุก 1 นาที
+  
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  blink();  // flash LED
+  // t_blink.update();  // flash LED
+
+  if (shouldReadSensor) {
+    shouldReadSensor = false;
+    controlRelay(); // เรียกใน task context ป้องกัน core dump
+  }
 
   // ตรวจสอบคำสั่งจาก Telegram
-  t_getTelegramMessage.update();
+  if (shouldCheckTelegram) {
+    shouldCheckTelegram = false;
+    getTelegramMessage(); // เรียกใน context ของ loop แทนการทำงานใน interrupt context
+  }
 
   t_relay.update();
   t_delayStart.update();
@@ -221,9 +254,16 @@ void loop() {
   t_relay2.update();
   t_delayStart2.update();
 
-  t_readSensor.update();
   t_sendDatatoThinkSpeak.update();
 
+}
+
+void setReadSensorFlag() {
+  shouldReadSensor = true;
+}
+
+void checkTelegramFlag() {
+  shouldCheckTelegram = true;
 }
 
 // Handle what happens when you receive new messages
@@ -233,6 +273,9 @@ void handleNewMessages(int numNewMessages)
   Serial.println(String(numNewMessages));
 
   for (int i=0; i<numNewMessages; i++) {
+    // เรียก yield เพื่อคืน control ให้ system และป้องกัน watchdog reset
+    yield();
+
     String chat_id = String(bot.messages[i].chat_id);
     // ตรวจสอบว่า chat_id อยู่ในรายชื่อ allowedChatIDs หรือไม่
     bool authorized = false;
@@ -516,7 +559,18 @@ void handleNewMessages(int numNewMessages)
     }
 
     else {
-      bot.sendMessage(chat_id, "คำสั่งไม่รู้จัก", "");
+      // bot.sendMessage(chat_id, "คำสั่งไม่รู้จัก/unknow command", "");
+      // หากคำสั่งไม่ตรงกับที่ระบุไว้ ให้ส่งข้อความช่วยเหลือ
+      String helpMsg = "คำสั่งที่สามารถใช้ได้ / Available commands:\n";
+      helpMsg += "/start - เริ่มต้นการใช้งาน / Start using the device\n";
+      helpMsg += "/status <id> - ตรวจสอบสถานะอุปกรณ์ / Check device status\n";
+      helpMsg += "/settemp <id> <lowTemp> <highTemp> - ตั้งค่า Temperature / Set temperature thresholds\n";
+      helpMsg += "/sethum <id> <lowHumidity> <highHumidity> - ตั้งค่า Humidity / Set humidity thresholds\n";
+      helpMsg += "/setmode <id> <auto/manual> - ตั้งค่าโหมดการทำงาน / Set operating mode\n";
+      helpMsg += "/setoption <id> <option> - ตั้งค่า Option (0-4) / Set option (0-4)\n";
+      helpMsg += "/relay <id> <state> - ควบคุม Relay (0: ปิด, 1: เปิด) / Control relay (0: off, 1: on)\n";
+      // หมายเหตุ: ไม่รวมคำสั่ง /info
+      bot.sendMessage(chat_id, helpMsg, "");
     }
 
   } // for loop message
@@ -529,6 +583,8 @@ void getTelegramMessage()
 
   while(numNewMessages) {
     Serial.println("got response");
+    // เรียก yield เพื่อคืน control ให้ system และป้องกัน watchdog reset
+    yield();
     handleNewMessages(numNewMessages);
     numNewMessages = bot.getUpdates(bot.last_message_received + 1);
   }
@@ -590,8 +646,6 @@ void turnRelay2On()
   digitalWrite(RELAY2, HIGH);
   Serial.println("RELAY2 ON");
   digitalWrite(LED_BUILTIN, LOW);  // turn on
-  led3.on();
-  Blynk.virtualWrite(V3, 1);
   buzzer_sound();
 }
 
@@ -600,8 +654,6 @@ void turnRelay2Off()
   digitalWrite(RELAY2, LOW);
   Serial.println("RELAY2 OFF");
   digitalWrite(LED_BUILTIN, HIGH);  // turn off
-  led3.off();
-  Blynk.virtualWrite(V3, 0);
   buzzer_sound();
 }
 #endif
@@ -611,7 +663,6 @@ void turnoff()
   afterStop = t_delayStart.after(standbyPeriod, delayStart);   // 10 * 60 * 1000 = 10 minutes
   t_relay.stop(afterStart);
   if (standbyPeriod >= 5000) {
-    // turnrelay_onoff(LOW);
     turnRelayOff();
     Serial.println("Timer Stop: RELAY1 OFF");
   }
@@ -631,7 +682,6 @@ void turnoffRelay2()
   afterStop2 = t_delayStart2.after(standbyPeriod, delayStart2);   // 10 * 60 * 1000 = 10 minutes
   t_relay2.stop(afterStart2);
   if (standbyPeriod >= 5000) {
-    // turnrelay_onoff(LOW);
     #ifdef SECONDRELAY
     turnRelay2Off();
     #endif
@@ -1073,14 +1123,7 @@ void buzzer_sound()
 
 void blink()
 {
-  unsigned long currentMillis = millis();
-
-  // if enough millis have elapsed
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-
-    // toggle the LED
-    ledState = !ledState;
-    digitalWrite(LED, ledState);
-  }
+  static bool ledState = false;  // ใช้ static variable เพื่อเก็บสถานะ LED ปัจจุบัน
+  ledState = !ledState;          // สลับสถานะ
+  digitalWrite(LED, ledState);
 }

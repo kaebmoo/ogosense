@@ -3,7 +3,7 @@
 #include <WiFiManager.h>
 #include "ogosense_eeprom.h"
 
-float lowTemp  = 25.0;   // เมื่ออุณหภูมิต่ำกว่าค่านี้ให้ปิด Relay
+float lowTemp  = 26.0;   // เมื่ออุณหภูมิต่ำกว่าค่านี้ให้ปิด Relay
 float highTemp = 30.0;   // เมื่ออุณหภูมิสูงกว่าค่านี้ให้เปิด Relay
 float lowHumidity = 55;
 float highHumidity = 60;
